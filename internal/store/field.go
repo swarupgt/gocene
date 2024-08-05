@@ -3,8 +3,8 @@ package store
 type FieldType int
 
 const (
-	String FieldType = iota
-	Int
+	StringField FieldType = iota
+	IntField
 )
 
 type Field struct {

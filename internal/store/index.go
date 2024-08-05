@@ -1,25 +1,38 @@
 package store
 
-import "strings"
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
 
 type Index struct {
 	// ID             int
-	Name           string
-	TermDictionary map[Term]TermData
-	Docs           []Document
-	Count          int
+	Name            string
+	TermDictionary  map[Term]TermData
+	Docs            []Document
+	Count           int
+	CaseSensitivity bool
 }
 
-func NewIndex() *Index {
+func NewIndex(name string) *Index {
 	return &Index{
-		TermDictionary: make(map[Term]TermData),
-		Docs:           make([]Document, 0),
-		Count:          0,
+		Name:            name,
+		TermDictionary:  make(map[Term]TermData),
+		Docs:            make([]Document, 0),
+		Count:           0,
+		CaseSensitivity: false,
 	}
 }
 
 // Needs to use mutex and event queues to handle concurrent events for index.
 func (idx *Index) AddDocument(doc *Document) (err error) {
+
+	if doc == nil {
+		return errors.New("empty document given")
+	}
+
+	doc.ID = idx.Count
 
 	// add doc to list
 	idx.Docs = append(idx.Docs, *doc)
@@ -30,7 +43,15 @@ func (idx *Index) AddDocument(doc *Document) (err error) {
 		if f.TokenizerString != "" {
 			tokens = strings.Split(f.Value, f.TokenizerString)
 		} else {
-			tokens = append(tokens, f.Value)
+			fmt.Println("case")
+			if idx.CaseSensitivity {
+				fmt.Println("case sense true")
+
+				tokens = append(tokens, f.Value)
+			} else {
+				fmt.Println("case sense false")
+				tokens = append(tokens, strings.ToLower(f.Value))
+			}
 		}
 
 		for _, token := range tokens {
@@ -65,7 +86,41 @@ func (idx *Index) AddDocument(doc *Document) (err error) {
 	idx.Count++
 
 	// Save to disk, handle concurrently later
-	SaveIndexToPersistentMemory(idx)
+	err = SaveIndexToPersistentMemory(idx)
+	return err
+}
+
+func (idx *Index) GetAllDocuments() (docs []Document) {
+	return idx.Docs
+}
+
+// improve lookup time
+func (idx *Index) GetDocument(id int) (doc Document, err error) {
+
+	for _, docIter := range idx.Docs {
+		if docIter.ID == id {
+			return docIter, nil
+		}
+	}
+
+	return Document{}, errors.New("document not found")
+}
+
+func (idx *Index) GetDocumentCount() int {
+	return len(idx.Docs)
+}
+
+func (idx *Index) GetTermsAndFreqFromDocNo(docNo int) (terms []Term, counts []int) {
+
+	for term, termData := range idx.TermDictionary {
+		terms = append(terms, term)
+		counts = append(counts, termData.DocFrequency[docNo]) // return counts of first document
+	}
+
+	return
+}
+
+func (idx *Index) DeleteDocument(docID int) (err error) {
 
 	return nil
 }

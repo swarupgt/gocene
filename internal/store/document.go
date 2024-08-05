@@ -1,7 +1,15 @@
 package store
 
+import "fmt"
+
 type Document struct {
+	ID     int
 	Fields []Field
+}
+
+type RankedDoc struct {
+	Score    int
+	Document Document
 }
 
 func NewDocument() *Document {
@@ -11,6 +19,9 @@ func NewDocument() *Document {
 }
 
 func (doc *Document) AddField(f Field) {
+
+	fmt.Println("field in doc: ", f.Name)
+
 	doc.Fields = append(doc.Fields, f)
 }
 
