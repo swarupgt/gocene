@@ -1,8 +1,13 @@
 # gocene
-A rudimentary implementation of an indexing and search engine in Go, inspired by Apache Lucene.
+A rudimentary implementation of an indexing and search engine in Go, kinda inspired by Apache Lucene.
 
 ## TODO
-- test the Full text search functionality
-- API for search and addition of documents
+- binary search for getDoc and modifyDoc
+- load persistent indices everytime server starts (currently does not, support exists tho)
+- test the Full text search functionality (done)
+- add logging 
+- API for search and addition of documents (partially done)
 - Docker image
-- Concurrency for search and indexing events
+
+## Notes
+- Consider dirty reads when index is currently being dropped

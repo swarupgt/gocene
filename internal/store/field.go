@@ -7,6 +7,7 @@ const (
 	IntField
 )
 
+// Currently only single level. For multilevel fields,
 type Field struct {
 	ID              int
 	Name            string

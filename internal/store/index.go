@@ -2,9 +2,11 @@ package store
 
 import (
 	"errors"
-	"fmt"
 	"strings"
+	"sync"
 )
+
+var ActiveIndices map[string]*Index
 
 type Index struct {
 	// ID             int
@@ -13,19 +15,26 @@ type Index struct {
 	Docs            []Document
 	Count           int
 	CaseSensitivity bool
+
+	Mutex sync.Mutex
 }
 
-func NewIndex(name string) *Index {
+// load persistent indices here
+func Init() {
+	ActiveIndices = make(map[string]*Index)
+}
+
+func NewIndex(name string, cs bool) *Index {
 	return &Index{
 		Name:            name,
 		TermDictionary:  make(map[Term]TermData),
 		Docs:            make([]Document, 0),
 		Count:           0,
-		CaseSensitivity: false,
+		CaseSensitivity: cs,
 	}
 }
 
-// Needs to use mutex and event queues to handle concurrent events for index.
+// Needs to use mutex to handle concurrent events for index.
 func (idx *Index) AddDocument(doc *Document) (err error) {
 
 	if doc == nil {
@@ -38,49 +47,9 @@ func (idx *Index) AddDocument(doc *Document) (err error) {
 	idx.Docs = append(idx.Docs, *doc)
 
 	// update term dictionary
-	for _, f := range doc.Fields {
-		var tokens []string
-		if f.TokenizerString != "" {
-			tokens = strings.Split(f.Value, f.TokenizerString)
-		} else {
-			fmt.Println("case")
-			if idx.CaseSensitivity {
-				fmt.Println("case sense true")
-
-				tokens = append(tokens, f.Value)
-			} else {
-				fmt.Println("case sense false")
-				tokens = append(tokens, strings.ToLower(f.Value))
-			}
-		}
-
-		for _, token := range tokens {
-			t := Term{
-				Field: f.Name,
-				Value: token,
-			}
-
-			// Check if TermData available for the given term
-			if td, exists := idx.TermDictionary[t]; !exists {
-				// create term data var and add to map
-
-				td = TermData{
-					Term:         t,
-					DocFrequency: make(map[int]int),
-				}
-				td.DocFrequency[idx.Count] = 1
-
-				idx.TermDictionary[t] = td
-
-			} else {
-				// increment the frequency of current term
-				if count := idx.TermDictionary[t].DocFrequency[idx.Count]; count == 0 {
-					idx.TermDictionary[t].DocFrequency[idx.Count] = 1
-				} else {
-					idx.TermDictionary[t].DocFrequency[idx.Count] += 1
-				}
-			}
-		}
+	err = idx.UpdateTermDictionary(doc.ID)
+	if err != nil {
+		return err
 	}
 
 	idx.Count++
@@ -120,7 +89,94 @@ func (idx *Index) GetTermsAndFreqFromDocNo(docNo int) (terms []Term, counts []in
 	return
 }
 
+func (idx *Index) ModifyDocument(id int, fs []Field) (err error) {
+	// do binary search later
+
+	for i, iter := range idx.Docs {
+		if iter.ID == id {
+			for _, f := range fs {
+				for j, jiter := range idx.Docs[i].Fields {
+					if f.Name == jiter.Name {
+						//update field value, type and tokeniser string
+						idx.Docs[i].Fields[j].Value = f.Value
+						idx.Docs[i].Fields[j].Type = f.Type
+						idx.Docs[i].Fields[j].TokenizerString = f.TokenizerString
+					}
+				}
+			}
+		}
+	}
+
+	//update term dictionary
+
+	return idx.UpdateTermDictionary(id)
+}
+
+// finish later
 func (idx *Index) DeleteDocument(docID int) (err error) {
+
+	return nil
+}
+
+// assumes doc is the updated version
+func (idx *Index) UpdateTermDictionary(docID int) (err error) {
+
+	// remove old terms from the dict using docID
+	for t := range idx.TermDictionary {
+		delete(idx.TermDictionary[t].DocFrequency, docID)
+	}
+
+	doc, err := idx.GetDocument(docID)
+	if err != nil {
+		return err
+	}
+
+	//add the new terms to the term dictionary
+
+	for _, f := range doc.Fields {
+		var tokens []string
+		if f.TokenizerString != "" {
+			tokens = strings.Split(f.Value, f.TokenizerString)
+		} else {
+			// fmt.Println("case")
+			if idx.CaseSensitivity {
+				// fmt.Println("case sense true")
+
+				tokens = append(tokens, f.Value)
+			} else {
+				// fmt.Println("case sense false")
+				tokens = append(tokens, strings.ToLower(f.Value))
+			}
+		}
+
+		for _, token := range tokens {
+			t := Term{
+				Field: f.Name,
+				Value: token,
+			}
+
+			// Check if TermData available for the given term
+			if td, exists := idx.TermDictionary[t]; !exists {
+				// create term data var and add to map
+
+				td = TermData{
+					Term:         t,
+					DocFrequency: make(map[int]int),
+				}
+				td.DocFrequency[docID] = 1
+
+				idx.TermDictionary[t] = td
+
+			} else {
+				// increment the frequency of current term
+				if count := idx.TermDictionary[t].DocFrequency[docID]; count == 0 {
+					idx.TermDictionary[t].DocFrequency[docID] = 1
+				} else {
+					idx.TermDictionary[t].DocFrequency[docID] += 1
+				}
+			}
+		}
+	}
 
 	return nil
 }
