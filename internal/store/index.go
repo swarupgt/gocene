@@ -13,7 +13,7 @@ type Index struct {
 	Name            string
 	TermDictionary  map[Term]TermData
 	Docs            []Document
-	Count           int
+	Count           int // tracks doc ID
 	CaseSensitivity bool
 
 	Mutex sync.RWMutex
@@ -35,12 +35,13 @@ func NewIndex(name string, cs bool) *Index {
 }
 
 // Needs to use mutex to handle concurrent events for index.
-func (idx *Index) AddDocument(doc *Document) (err error) {
+func (idx *Index) AddDocument(doc *Document) (id int, err error) {
 
 	if doc == nil {
-		return errors.New("empty document given")
+		return 0, errors.New("empty document given")
 	}
 
+	idx.Count++
 	doc.ID = idx.Count
 
 	// add doc to list
@@ -49,14 +50,12 @@ func (idx *Index) AddDocument(doc *Document) (err error) {
 	// update term dictionary
 	err = idx.UpdateTermDictionary(doc.ID)
 	if err != nil {
-		return err
+		return 0, err
 	}
-
-	idx.Count++
 
 	// Save to disk, handle concurrently later
 	err = SaveIndexToPersistentMemory(idx)
-	return err
+	return idx.Count, err
 }
 
 func (idx *Index) GetAllDocuments() (docs []Document) {

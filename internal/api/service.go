@@ -73,7 +73,7 @@ func (s *Service) AddDocument(idxName string, inp AddDocumentInput) (res *AddDoc
 		}, err
 	}
 
-	err = idx.AddDocument(doc)
+	docId, err := idx.AddDocument(doc)
 	if err != nil {
 		return &AddDocumentResult{
 			Success: false,
@@ -81,6 +81,7 @@ func (s *Service) AddDocument(idxName string, inp AddDocumentInput) (res *AddDoc
 	}
 
 	res = &AddDocumentResult{
+		DocID:   docId,
 		Success: true,
 	}
 

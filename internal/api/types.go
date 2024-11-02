@@ -22,5 +22,6 @@ type GetIndicesResult struct {
 }
 
 type AddDocumentResult struct {
+	DocID   int  `json:"doc_id,omitempty"`
 	Success bool `json:"success"`
 }
