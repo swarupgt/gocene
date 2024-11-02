@@ -1,12 +1,17 @@
 package api
 
-import "gocene/internal/store"
+import (
+	"gocene/internal/store"
+	"gocene/internal/utils"
+	"log"
+)
 
 // all api service functions here
 
 type Service struct {
 }
 
+// Creates a new index.
 func (s *Service) CreateIndex(inp CreateIndexInput) (res *CreateIndexResult, err error) {
 
 	// return err if same name exists
@@ -31,6 +36,7 @@ func (s *Service) CreateIndex(inp CreateIndexInput) (res *CreateIndexResult, err
 	return
 }
 
+// Gets the list of all active indices on the service.
 func (s *Service) GetIndices() (res *GetIndicesResult, err error) {
 
 	res = &GetIndicesResult{}
@@ -40,4 +46,44 @@ func (s *Service) GetIndices() (res *GetIndicesResult, err error) {
 	}
 
 	return
+}
+
+func (s *Service) AddDocument(idxName string, inp AddDocumentInput) (res *AddDocumentResult, err error) {
+
+	log.Println("inside service AddDocument()")
+
+	var idx *store.Index
+	var ok bool
+
+	if idx, ok = store.ActiveIndices[idxName]; !ok {
+		log.Println(ErrIdxDoesNotExist.Error())
+		//index does not exist
+		return nil, ErrIdxDoesNotExist
+	}
+
+	idx.Mutex.Lock()
+	defer idx.Mutex.Unlock()
+
+	// create doc and add
+
+	doc, err := utils.CreateDocumentFromMap(inp.Data)
+	if err != nil {
+		return &AddDocumentResult{
+			Success: false,
+		}, err
+	}
+
+	err = idx.AddDocument(doc)
+	if err != nil {
+		return &AddDocumentResult{
+			Success: false,
+		}, err
+	}
+
+	res = &AddDocumentResult{
+		Success: true,
+	}
+
+	return
+
 }

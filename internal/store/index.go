@@ -16,7 +16,7 @@ type Index struct {
 	Count           int
 	CaseSensitivity bool
 
-	Mutex sync.Mutex
+	Mutex sync.RWMutex
 }
 
 // load persistent indices here

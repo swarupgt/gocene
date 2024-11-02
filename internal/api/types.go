@@ -8,8 +8,8 @@ type CreateIndexInput struct {
 }
 
 type AddDocumentInput struct {
-	IndexName string
-	Data      map[string]interface{}
+	// IndexName string
+	Data map[string]interface{}
 }
 
 // result structs

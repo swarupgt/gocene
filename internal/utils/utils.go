@@ -35,3 +35,25 @@ func CreateDocumentFromJSON(jsonString string) (doc *store.Document, err error) 
 
 	return doc, nil
 }
+
+func CreateDocumentFromMap(obj map[string]interface{}) (doc *store.Document, err error) {
+
+	var id int = 0
+
+	doc = store.NewDocument()
+
+	for key := range obj {
+		field := store.Field{
+			ID:              id,
+			Name:            key,
+			Type:            store.StringField,
+			TokenizerString: " ",
+			Value:           fmt.Sprint(obj[key]),
+		}
+
+		doc.AddField(field)
+		id++
+	}
+
+	return doc, nil
+}

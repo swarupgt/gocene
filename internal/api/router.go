@@ -41,6 +41,10 @@ func (router *Router) SetEndpoints() {
 			router.R.GET(endpoint, func(ctx *gin.Context) {
 				router.Cont.GetIndices(ctx)
 			})
+		} else if apiId == config.AddDocumentAPI {
+			router.R.POST(endpoint, func(ctx *gin.Context) {
+				router.Cont.AddDocument(ctx)
+			})
 		}
 	}
 }

@@ -3,7 +3,7 @@ package config
 const (
 	CreateIndexAPI = iota
 	GetIndicesAPI
-	// AddDocumentAPI
+	AddDocumentAPI
 	// ModifyDocumentAPI
 	// GetDocumentAPI
 	// GetAllDocumentsAPI
@@ -16,7 +16,7 @@ var (
 	EndpointsMap map[int]string = map[int]string{
 		CreateIndexAPI: "/create_index",
 		GetIndicesAPI:  "/indices",
-		// AddDocumentAPI:     "/:idx_name/add_document",
+		AddDocumentAPI: "/:idx_name/add_document",
 		// ModifyDocumentAPI:  "/:idx_name/modify_document",
 		// GetDocumentAPI:     "/:idx_name/get_document",
 		// GetAllDocumentsAPI: "/:idx_name/get_all",
