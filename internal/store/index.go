@@ -37,6 +37,9 @@ func NewIndex(name string, cs bool) *Index {
 // Needs to use mutex to handle concurrent events for index.
 func (idx *Index) AddDocument(doc *Document) (id int, err error) {
 
+	idx.Mutex.Lock()
+	defer idx.Mutex.Unlock()
+
 	if doc == nil {
 		return 0, errors.New("empty document given")
 	}
@@ -65,6 +68,9 @@ func (idx *Index) GetAllDocuments() (docs []Document) {
 // improve lookup time
 func (idx *Index) GetDocument(id int) (doc Document, err error) {
 
+	idx.Mutex.RLock()
+	defer idx.Mutex.RUnlock()
+
 	for _, docIter := range idx.Docs {
 		if docIter.ID == id {
 			return docIter, nil
@@ -75,10 +81,16 @@ func (idx *Index) GetDocument(id int) (doc Document, err error) {
 }
 
 func (idx *Index) GetDocumentCount() int {
+	idx.Mutex.RLock()
+	defer idx.Mutex.RUnlock()
+
 	return len(idx.Docs)
 }
 
 func (idx *Index) GetTermsAndFreqFromDocNo(docNo int) (terms []Term, counts []int) {
+
+	idx.Mutex.RLock()
+	defer idx.Mutex.RUnlock()
 
 	for term, termData := range idx.TermDictionary {
 		terms = append(terms, term)
@@ -90,6 +102,9 @@ func (idx *Index) GetTermsAndFreqFromDocNo(docNo int) (terms []Term, counts []in
 
 func (idx *Index) ModifyDocument(id int, fs []Field) (err error) {
 	// do binary search later
+
+	idx.Mutex.Lock()
+	defer idx.Mutex.Unlock()
 
 	for i, iter := range idx.Docs {
 		if iter.ID == id {
@@ -113,6 +128,9 @@ func (idx *Index) ModifyDocument(id int, fs []Field) (err error) {
 
 // finish later
 func (idx *Index) DeleteDocument(docID int) (err error) {
+
+	idx.Mutex.Lock()
+	defer idx.Mutex.Unlock()
 
 	return nil
 }

@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-// Make it concurrent
+// Use queues to handle writes to file.
 func SaveIndexToPersistentMemory(idx *Index) (err error) {
 	f, err := os.Create(config.IndexFileDirectory + idx.Name + config.IndexFileExtension)
 	if err != nil {

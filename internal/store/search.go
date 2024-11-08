@@ -9,6 +9,9 @@ import (
 // Currently only uses the frequency of term to rank the documents.
 func (idx *Index) SearchTerm(t Term) (res []RankedDoc, err error) {
 
+	idx.Mutex.RLock()
+	defer idx.Mutex.RUnlock()
+
 	// search if index mutex not locked
 
 	td, found := idx.TermDictionary[t]
@@ -50,6 +53,9 @@ func (idx *Index) SearchTerm(t Term) (res []RankedDoc, err error) {
 // Future - Use relative positions of terms to rank better.
 // Currently uses only total frequency of all words as score to rank results.
 func (idx *Index) SearchFullText(terms []Term) (res []RankedDoc, err error) {
+
+	idx.Mutex.RLock()
+	defer idx.Mutex.RUnlock()
 
 	var allDocsMap map[int]RankedDoc = make(map[int]RankedDoc)
 
