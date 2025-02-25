@@ -2,6 +2,8 @@ package store
 
 import (
 	"errors"
+	"fmt"
+	"log"
 	"strings"
 	"sync"
 )
@@ -56,6 +58,8 @@ func (idx *Index) AddDocument(doc *Document) (id int, err error) {
 		return 0, err
 	}
 
+	log.Println("term dictionary updated")
+
 	// Save to disk, handle concurrently later
 	err = SaveIndexToPersistentMemory(idx)
 	return idx.Count, err
@@ -77,7 +81,7 @@ func (idx *Index) GetDocument(id int) (doc Document, err error) {
 		}
 	}
 
-	return Document{}, errors.New("document not found")
+	return Document{}, ErrDocumentNotFound
 }
 
 func (idx *Index) GetDocumentCount() int {
@@ -143,10 +147,25 @@ func (idx *Index) UpdateTermDictionary(docID int) (err error) {
 		delete(idx.TermDictionary[t].DocFrequency, docID)
 	}
 
-	doc, err := idx.GetDocument(docID)
-	if err != nil {
-		return err
+	fmt.Println("old terms removed")
+
+	// get the doc
+	var doc Document
+	var found bool = false
+
+	for _, docIter := range idx.Docs {
+		if docIter.ID == docID {
+			doc = docIter
+			found = true
+			break
+		}
 	}
+
+	if !found {
+		return ErrDocumentNotFound
+	}
+
+	fmt.Println("doc retrieved")
 
 	//add the new terms to the term dictionary
 

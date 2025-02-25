@@ -5,7 +5,7 @@ const (
 	GetIndicesAPI
 	AddDocumentAPI
 	// ModifyDocumentAPI
-	// GetDocumentAPI
+	GetDocumentAPI
 	// GetAllDocumentsAPI
 	// GetIndexDetailsAPI
 	// SearchFullTextAPI
@@ -18,7 +18,7 @@ var (
 		GetIndicesAPI:  "/indices",
 		AddDocumentAPI: "/:idx_name/add_document",
 		// ModifyDocumentAPI:  "/:idx_name/modify_document",
-		// GetDocumentAPI:     "/:idx_name/get_document",
+		GetDocumentAPI: "/:idx_name/get_document",
 		// GetAllDocumentsAPI: "/:idx_name/get_all",
 		// GetIndexDetailsAPI: "/:idx_name",
 		// SearchFullTextAPI:  "/:idx_name/search",

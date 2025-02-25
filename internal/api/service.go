@@ -61,9 +61,6 @@ func (s *Service) AddDocument(idxName string, inp AddDocumentInput) (res *AddDoc
 		return nil, ErrIdxDoesNotExist
 	}
 
-	idx.Mutex.Lock()
-	defer idx.Mutex.Unlock()
-
 	// create doc and add
 
 	doc, err := utils.CreateDocumentFromMap(inp.Data)
@@ -87,4 +84,30 @@ func (s *Service) AddDocument(idxName string, inp AddDocumentInput) (res *AddDoc
 
 	return
 
+}
+
+func (s *Service) GetDocument(idxName string, inp GetDocumentInput) (res *GetDocumentResult, err error) {
+
+	log.Println("inside service GetDocument()")
+
+	var idx *store.Index
+	var ok bool
+
+	if idx, ok = store.ActiveIndices[idxName]; !ok {
+		log.Println(ErrIdxDoesNotExist.Error())
+		//index does not exist
+		return nil, ErrIdxDoesNotExist
+	}
+
+	doc, err := idx.GetDocument(inp.DocID)
+	if err != nil {
+		return
+	}
+
+	res = &GetDocumentResult{
+		DocID:    doc.ID,
+		Document: doc.DocMap,
+	}
+
+	return
 }

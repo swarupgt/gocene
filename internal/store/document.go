@@ -5,6 +5,7 @@ import "fmt"
 type Document struct {
 	ID     int
 	Fields []Field
+	DocMap map[string]interface{} // for fast retrieval
 }
 
 type RankedDoc struct {

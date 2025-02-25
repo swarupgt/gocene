@@ -25,3 +25,12 @@ type AddDocumentResult struct {
 	DocID   int  `json:"doc_id,omitempty"`
 	Success bool `json:"success"`
 }
+
+type GetDocumentInput struct {
+	DocID int `json:"doc_id" binding:"required"`
+}
+
+type GetDocumentResult struct {
+	DocID    int                    `json:"doc_id"`
+	Document map[string]interface{} `json:"document"`
+}

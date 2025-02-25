@@ -45,6 +45,10 @@ func (router *Router) SetEndpoints() {
 			router.R.POST(endpoint, func(ctx *gin.Context) {
 				router.Cont.AddDocument(ctx)
 			})
+		} else if apiId == config.GetDocumentAPI {
+			router.R.POST(endpoint, func(ctx *gin.Context) {
+				router.Cont.GetDocument(ctx)
+			})
 		}
 	}
 }
