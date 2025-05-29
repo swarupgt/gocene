@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"fmt"
+	"log"
 	"sort"
 )
 
@@ -22,7 +23,7 @@ func (idx *Index) SearchTerm(t Term) (res []RankedDoc, err error) {
 
 	var freqs, docnos []int
 
-	for docno, freq := range td.DocFrequency {
+	for docno, freq := range td {
 		docnos = append(docnos, docno)
 		freqs = append(freqs, freq)
 	}
@@ -38,13 +39,10 @@ func (idx *Index) SearchTerm(t Term) (res []RankedDoc, err error) {
 	})
 
 	for i, docID := range docnos {
-		if tempdoc, err := idx.GetDocument(docID); err == nil {
-			res = append(res, RankedDoc{
-				Score:    freqs[i],
-				Document: tempdoc,
-			})
-		}
-
+		res = append(res, RankedDoc{
+			Score: freqs[i],
+			DocID: docID,
+		})
 	}
 
 	return
@@ -54,6 +52,8 @@ func (idx *Index) SearchTerm(t Term) (res []RankedDoc, err error) {
 // Currently uses only total frequency of all words as score to rank results.
 func (idx *Index) SearchFullText(terms []Term) (res []RankedDoc, err error) {
 
+	log.Println("inside store SearchFullText()")
+
 	idx.Mutex.RLock()
 	defer idx.Mutex.RUnlock()
 
@@ -61,19 +61,20 @@ func (idx *Index) SearchFullText(terms []Term) (res []RankedDoc, err error) {
 
 	for _, term := range terms {
 		tempRes, err := idx.SearchTerm(term)
-		if err != nil {
+		fmt.Println("found results for term: ", term, " - ", tempRes)
+		if err != nil && err.Error() != "no documents contain given term" {
 			return nil, err
 		}
 
 		for _, iter := range tempRes {
-			if _, exists := allDocsMap[iter.Document.ID]; exists {
-				temp := allDocsMap[iter.Document.ID]
+			if _, exists := allDocsMap[iter.DocID]; exists {
+				temp := allDocsMap[iter.DocID]
 				temp.Score += iter.Score
-				allDocsMap[iter.Document.ID] = temp
+				allDocsMap[iter.DocID] = temp
 			} else {
-				allDocsMap[iter.Document.ID] = RankedDoc{
-					Score:    iter.Score,
-					Document: iter.Document,
+				allDocsMap[iter.DocID] = RankedDoc{
+					Score: iter.Score,
+					DocID: iter.DocID,
 				}
 			}
 		}

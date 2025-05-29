@@ -9,8 +9,8 @@ type Document struct {
 }
 
 type RankedDoc struct {
-	Score    int
-	Document Document
+	Score int `json:"score"`
+	DocID int `json:"doc_id"`
 }
 
 func NewDocument() *Document {

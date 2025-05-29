@@ -111,3 +111,31 @@ func (s *Service) GetDocument(idxName string, inp GetDocumentInput) (res *GetDoc
 
 	return
 }
+
+func (s *Service) SearchFullText(idxName string, inp SearchInput) (res *SearchResult, err error) {
+
+	log.Println("inside service SearchFullText()")
+
+	var idx *store.Index
+	var ok bool
+
+	if idx, ok = store.ActiveIndices[idxName]; !ok {
+		log.Println(ErrIdxDoesNotExist.Error())
+		//index does not exist
+		return nil, ErrIdxDoesNotExist
+	}
+
+	terms := utils.GetTermsFromPhrase(inp.SearchField, inp.SearchPhrase)
+
+	rankedDocs, err := idx.SearchFullText(terms)
+	if err != nil {
+		return nil, err
+	}
+
+	res = &SearchResult{
+		Results: rankedDocs,
+		Count:   len(rankedDocs),
+	}
+
+	return
+}

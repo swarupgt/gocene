@@ -5,10 +5,7 @@ type Term struct {
 	Value string
 }
 
-type TermData struct {
-	Term         Term
-	DocFrequency map[int]int // Doc number to frequency mapping
-}
+type TermData map[int]int // Doc number to frequency mapping
 
 func NewTerm(f, v string) Term {
 	return Term{

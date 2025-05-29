@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"gocene/internal/store"
 	"log"
+	"strings"
 )
 
 // Only parses JSONs of single level and type string at the moment, see how lucene does it for any JSON
@@ -63,3 +64,18 @@ func CreateDocumentFromMap(obj map[string]interface{}) (doc *store.Document, err
 }
 
 // func LoadIndicesFromDirectory(dirPath string)
+
+func GetTermsFromPhrase(field, phrase string) (terms []store.Term) {
+	log.Println("inside GetTermsFromPhrase()")
+	// Split the search phrase into terms
+	strs := strings.Split(phrase, " ")
+	for _, str := range strs {
+		term := store.Term{
+			Field: field,
+			Value: str,
+		}
+		terms = append(terms, term)
+	}
+
+	return terms
+}

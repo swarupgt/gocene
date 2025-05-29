@@ -98,12 +98,13 @@ func (idx *Index) GetTermsAndFreqFromDocNo(docNo int) (terms []Term, counts []in
 
 	for term, termData := range idx.TermDictionary {
 		terms = append(terms, term)
-		counts = append(counts, termData.DocFrequency[docNo]) // return counts of first document
+		counts = append(counts, termData[docNo]) // return counts of first document
 	}
 
 	return
 }
 
+// Should this even exist?
 func (idx *Index) ModifyDocument(id int, fs []Field) (err error) {
 	// do binary search later
 
@@ -126,7 +127,6 @@ func (idx *Index) ModifyDocument(id int, fs []Field) (err error) {
 	}
 
 	//update term dictionary
-
 	return idx.UpdateTermDictionary(id)
 }
 
@@ -140,14 +140,8 @@ func (idx *Index) DeleteDocument(docID int) (err error) {
 }
 
 // assumes doc is the updated version
+// TODO: send document instead of docID for speed
 func (idx *Index) UpdateTermDictionary(docID int) (err error) {
-
-	// remove old terms from the dict using docID
-	for t := range idx.TermDictionary {
-		delete(idx.TermDictionary[t].DocFrequency, docID)
-	}
-
-	fmt.Println("old terms removed")
 
 	// get the doc
 	var doc Document
@@ -192,24 +186,15 @@ func (idx *Index) UpdateTermDictionary(docID int) (err error) {
 			}
 
 			// Check if TermData available for the given term
-			if td, exists := idx.TermDictionary[t]; !exists {
-				// create term data var and add to map
-
-				td = TermData{
-					Term:         t,
-					DocFrequency: make(map[int]int),
-				}
-				td.DocFrequency[docID] = 1
-
+			if _, exists := idx.TermDictionary[t]; !exists {
+				// create term data and add to map
+				var td TermData = make(map[int]int)
+				td[docID] = 1
 				idx.TermDictionary[t] = td
 
 			} else {
 				// increment the frequency of current term
-				if count := idx.TermDictionary[t].DocFrequency[docID]; count == 0 {
-					idx.TermDictionary[t].DocFrequency[docID] = 1
-				} else {
-					idx.TermDictionary[t].DocFrequency[docID] += 1
-				}
+				idx.TermDictionary[t][docID] += 1
 			}
 		}
 	}

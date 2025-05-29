@@ -127,4 +127,34 @@ func (c *Controller) GetDocument(ctx *gin.Context) (status int) {
 	return http.StatusOK
 }
 
-//search full text
+// search full text
+func (c *Controller) SearchFullText(ctx *gin.Context) (status int) {
+	log.Println("inside cont SearchFullText()")
+
+	idx := ctx.Param("idx_name")
+	if idx == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "index not specified"})
+		return http.StatusBadRequest
+	}
+
+	var inp SearchInput
+	if err := ctx.BindJSON(&inp); err != nil {
+		//bind failed, return 400
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "incorrect input structure"})
+		return http.StatusBadRequest
+	}
+
+	res, err := c.serv.SearchFullText(idx, inp)
+	if err != nil {
+		if err == ErrIdxDoesNotExist {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "index specified does not exist"})
+			return http.StatusBadRequest
+		} else {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "something went wrong"})
+			return http.StatusInternalServerError
+		}
+	}
+
+	ctx.JSON(http.StatusOK, res)
+	return http.StatusOK
+}

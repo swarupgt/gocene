@@ -8,7 +8,7 @@ const (
 	GetDocumentAPI
 	// GetAllDocumentsAPI
 	// GetIndexDetailsAPI
-	// SearchFullTextAPI
+	SearchFullTextAPI
 	// SearchTermAPI
 )
 
@@ -21,7 +21,7 @@ var (
 		GetDocumentAPI: "/:idx_name/get_document",
 		// GetAllDocumentsAPI: "/:idx_name/get_all",
 		// GetIndexDetailsAPI: "/:idx_name",
-		// SearchFullTextAPI:  "/:idx_name/search",
+		SearchFullTextAPI: "/:idx_name/search",
 		// SearchTermAPI:      "/:idx_name/search_term",
 	}
 )

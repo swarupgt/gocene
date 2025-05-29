@@ -49,6 +49,10 @@ func (router *Router) SetEndpoints() {
 			router.R.POST(endpoint, func(ctx *gin.Context) {
 				router.Cont.GetDocument(ctx)
 			})
+		} else if apiId == config.SearchFullTextAPI {
+			router.R.POST(endpoint, func(ctx *gin.Context) {
+				router.Cont.SearchFullText(ctx)
+			})
 		}
 	}
 }

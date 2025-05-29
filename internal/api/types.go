@@ -1,5 +1,7 @@
 package api
 
+import "gocene/internal/store"
+
 // input structs
 
 type CreateIndexInput struct {
@@ -33,4 +35,14 @@ type GetDocumentInput struct {
 type GetDocumentResult struct {
 	DocID    int                    `json:"doc_id"`
 	Document map[string]interface{} `json:"document"`
+}
+
+type SearchInput struct {
+	SearchField  string `json:"search_field" binding:"required"`
+	SearchPhrase string `json:"search_phrase" binding:"required"`
+}
+
+type SearchResult struct {
+	Results []store.RankedDoc `json:"results"`
+	Count   int               `json:"count"`
 }
