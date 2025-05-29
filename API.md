@@ -31,7 +31,7 @@ POST `/<index_name>/search`
 ```
 
 ### 4. Get Document
-GET `/<index_name>/get_document`
+POST `/<index_name>/get_document`
 ```JSON
 {
    "doc_id": 1
