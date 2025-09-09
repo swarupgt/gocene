@@ -86,28 +86,29 @@ func (s *Service) AddDocument(idxName string, inp AddDocumentInput) (res *AddDoc
 
 }
 
+// does nothing
 func (s *Service) GetDocument(idxName string, inp GetDocumentInput) (res *GetDocumentResult, err error) {
 
 	log.Println("inside service GetDocument()")
 
-	var idx *store.Index
-	var ok bool
+	// var idx *store.Index
+	// var ok bool
 
-	if idx, ok = store.ActiveIndices[idxName]; !ok {
-		log.Println(ErrIdxDoesNotExist.Error())
-		//index does not exist
-		return nil, ErrIdxDoesNotExist
-	}
+	// if idx, ok = store.ActiveIndices[idxName]; !ok {
+	// 	log.Println(ErrIdxDoesNotExist.Error())
+	// 	//index does not exist
+	// 	return nil, ErrIdxDoesNotExist
+	// }
 
-	doc, err := idx.GetDocument(inp.DocID)
-	if err != nil {
-		return
-	}
+	// doc, err := idx.GetDocument(inp.DocID)
+	// if err != nil {
+	// 	return
+	// }
 
-	res = &GetDocumentResult{
-		DocID:    doc.ID,
-		Document: doc.DocMap,
-	}
+	// res = &GetDocumentResult{
+	// 	DocID:    doc.ID,
+	// 	Document: doc.DocMap,
+	// }
 
 	return
 }
@@ -121,7 +122,7 @@ func (s *Service) SearchFullText(idxName string, inp SearchInput) (res *SearchRe
 
 	if idx, ok = store.ActiveIndices[idxName]; !ok {
 		log.Println(ErrIdxDoesNotExist.Error())
-		//index does not exist
+		// index does not exist
 		return nil, ErrIdxDoesNotExist
 	}
 

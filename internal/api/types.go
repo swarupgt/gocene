@@ -1,6 +1,8 @@
 package api
 
-import "gocene/internal/store"
+import (
+	"gocene/internal/store"
+)
 
 // input structs
 
@@ -43,6 +45,6 @@ type SearchInput struct {
 }
 
 type SearchResult struct {
-	Results []store.RankedDoc `json:"results"`
-	Count   int               `json:"count"`
+	Results []store.RankedResultDoc `json:"results"`
+	Count   int                     `json:"count"`
 }

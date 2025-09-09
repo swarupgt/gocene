@@ -12,7 +12,7 @@ Search only supports a single field for now :/
 API Documentation -> [HERE](./API.md)
 
 ## TODO
-- segments and persistent indices
+- add top k functionality, and top k results in search doesn't need sorting again
 - tests 
 - partitioning and replication for durability
 

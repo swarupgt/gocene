@@ -76,8 +76,8 @@ func (c *Controller) AddDocument(ctx *gin.Context) (status int) {
 
 	res, err := c.serv.AddDocument(idx, inp)
 	if err != nil {
+		log.Println("Error adding document: ", err.Error())
 		if err == ErrIdxDoesNotExist {
-			log.Println(1121)
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "index specified does not exist"})
 			return http.StatusBadRequest
 		} else {

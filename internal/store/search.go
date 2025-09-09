@@ -1,95 +1,121 @@
 package store
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
 	"log"
 	"sort"
+	"sync"
 )
 
-// Currently only uses the frequency of term to rank the documents.
-func (idx *Index) SearchTerm(t Term) (res []RankedDoc, err error) {
-
-	idx.Mutex.RLock()
-	defer idx.Mutex.RUnlock()
-
-	// search if index mutex not locked
-
-	td, found := idx.TermDictionary[t]
-
-	if !found {
-		return nil, errors.New("no documents contain given term")
-	}
-
-	var freqs, docnos []int
-
-	for docno, freq := range td {
-		docnos = append(docnos, docno)
-		freqs = append(freqs, freq)
-	}
-
-	fmt.Println("docnos: ", docnos)
-
-	sort.SliceStable(docnos, func(i, j int) bool {
-		return freqs[i] > freqs[j]
-	})
-
-	sort.SliceStable(freqs, func(i, j int) bool {
-		return freqs[i] > freqs[j]
-	})
-
-	for i, docID := range docnos {
-		res = append(res, RankedDoc{
-			Score: freqs[i],
-			DocID: docID,
-		})
-	}
-
-	return
+type RankedResultDoc struct {
+	Score int             `json:"score"`
+	Data  json.RawMessage `json:"data"`
 }
 
-// Future - Use relative positions of terms to rank better.
-// Currently uses only total frequency of all words as score to rank results.
-func (idx *Index) SearchFullText(terms []Term) (res []RankedDoc, err error) {
+type RankedDocData struct {
+	Score     int
+	ParentSeg *Segment
+
+	DocID int
+}
+
+// Searches all the segments in the index concurrently.
+// Todo: Limit goroutine spawning
+func (idx *Index) SearchFullText(terms []Term) (results []RankedResultDoc, err error) {
+
+	var res []RankedDocData
 
 	log.Println("inside store SearchFullText()")
 
-	idx.Mutex.RLock()
-	defer idx.Mutex.RUnlock()
+	resChan := make(chan []RankedDocData, len(idx.Segments)+1)
+	resErrs := make(chan error, len(idx.Segments)+1)
+	var wg sync.WaitGroup
 
-	var allDocsMap map[int]RankedDoc = make(map[int]RankedDoc)
+	// search segments concurrently
+	for _, seg := range idx.Segments {
+		log.Println("searching immutable segment")
+		wg.Add(1)
+		go func(s *Segment) {
+			defer wg.Done()
+			sRes, err := s.SearchFullText(terms)
 
-	for _, term := range terms {
-		tempRes, err := idx.SearchTerm(term)
-		fmt.Println("found results for term: ", term, " - ", tempRes)
-		if err != nil && err.Error() != "no documents contain given term" {
-			return nil, err
-		}
-
-		for _, iter := range tempRes {
-			if _, exists := allDocsMap[iter.DocID]; exists {
-				temp := allDocsMap[iter.DocID]
-				temp.Score += iter.Score
-				allDocsMap[iter.DocID] = temp
-			} else {
-				allDocsMap[iter.DocID] = RankedDoc{
-					Score: iter.Score,
-					DocID: iter.DocID,
-				}
+			var resTemp []RankedDocData
+			for _, r := range sRes {
+				resTemp = append(resTemp, RankedDocData{
+					Score:     r.Score,
+					ParentSeg: s,
+					DocID:     r.DocID,
+				})
 			}
+
+			resChan <- resTemp
+			resErrs <- err
+
+		}(seg)
+	}
+
+	// search active segment too, needs a lock
+	wg.Add(1)
+	go func(as *ActiveSegment) {
+		log.Println("searching active segment")
+		defer wg.Done()
+
+		as.Mutex.RLock()
+		defer as.Mutex.RUnlock()
+
+		asRes, err := as.Seg.SearchFullText(terms)
+
+		var resTemp []RankedDocData
+		for _, r := range asRes {
+			resTemp = append(resTemp, RankedDocData{
+				Score:     r.Score,
+				ParentSeg: as.Seg,
+				DocID:     r.DocID,
+			})
+		}
+
+		resChan <- resTemp
+		resErrs <- err
+	}(&idx.As)
+
+	go func() {
+		wg.Wait()
+		close(resChan)
+		close(resErrs)
+	}()
+
+	// do merge algo for top k later, since all segments return sorted
+	// aggregate
+	for temp := range resChan {
+		res = append(res, temp...)
+	}
+
+	for tempErr := range resErrs {
+		if tempErr != nil {
+			log.Println("error searching an index")
 		}
 	}
 
-	var scores []int
+	// score results
+	sort.SliceStable(res, func(i, j int) bool {
+		return res[i].Score > res[j].Score
+	})
 
-	for _, doc := range allDocsMap {
-		scores = append(scores, doc.Score)
-		res = append(res, doc)
+	// get the json data for each scored and ranked doc
+	for _, iter := range res {
+		jsonStr, err := iter.ParentSeg.GetDocument(iter.DocID)
+		if err != nil {
+			log.Println("error getting document: ", err.Error())
+		}
+		fmt.Println("json str: ", jsonStr)
+		results = append(results, RankedResultDoc{
+			Score: iter.Score,
+			Data:  json.RawMessage(jsonStr),
+		})
 	}
 
-	sort.SliceStable(res, func(i, j int) bool {
-		return scores[i] > scores[j]
-	})
+	fmt.Println("RESULT OF SEARCH FINAL - ", results)
 
 	return
 }

@@ -6,4 +6,6 @@ const (
 
 	// Directory where index files are stored
 	IndexFileDirectory = `/home/swarup/workspace/sidep/gocene/index_files/`
+
+	SegmentDirectory = `/home/swarup/workspace/sidep/gocene/app_test/segments/`
 )
