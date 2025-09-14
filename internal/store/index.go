@@ -49,7 +49,7 @@ func (idx *Index) AddDocument(doc *Document) (id int, err error) {
 	id, err = idx.As.AddDocument(doc)
 
 	// add to segments if active segment full
-	if idx.As.DocCount >= config.ActiveSegmentCount {
+	if idx.As.Seg.Metadata.docCount >= config.ActiveSegmentCount {
 		err = idx.Refresh()
 		if err != nil {
 			log.Println("could not refresh() index ", idx.Name)
