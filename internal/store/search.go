@@ -2,7 +2,6 @@ package store
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"sort"
 	"sync"
@@ -34,7 +33,7 @@ func (idx *Index) SearchFullText(terms []Term) (results []RankedResultDoc, err e
 
 	// search segments concurrently
 	for _, seg := range idx.Segments {
-		log.Println("searching immutable segment")
+		// log.Println("searching immutable segment")
 		wg.Add(1)
 		go func(s *Segment) {
 			defer wg.Done()
@@ -58,7 +57,7 @@ func (idx *Index) SearchFullText(terms []Term) (results []RankedResultDoc, err e
 	// search active segment too, needs a lock
 	wg.Add(1)
 	go func(as *ActiveSegment) {
-		log.Println("searching active segment")
+		// log.Println("searching active segment")
 		defer wg.Done()
 
 		as.Mutex.RLock()
@@ -108,14 +107,14 @@ func (idx *Index) SearchFullText(terms []Term) (results []RankedResultDoc, err e
 		if err != nil {
 			log.Println("error getting document: ", err.Error())
 		}
-		fmt.Println("json str: ", jsonStr)
+		// fmt.Println("json str: ", jsonStr)
 		results = append(results, RankedResultDoc{
 			Score: iter.Score,
 			Data:  json.RawMessage(jsonStr),
 		})
 	}
 
-	fmt.Println("RESULT OF SEARCH FINAL - ", results)
+	// fmt.Println("RESULT OF SEARCH FINAL - ", results)
 
 	return
 }

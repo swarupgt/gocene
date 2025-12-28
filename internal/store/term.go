@@ -1,8 +1,8 @@
 package store
 
 type Term struct {
-	Field string
-	Value string
+	Field string `json:"field"`
+	Value string `json:"value"`
 }
 
 type TermData map[int]int // Doc number to frequency mapping

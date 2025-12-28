@@ -1,50 +1,47 @@
 package store
 
 import (
-	"encoding/gob"
-	"gocene/config"
+	"bufio"
+	"io"
 	"log"
-	"os"
 )
 
-// Use queues to handle writes to file.
-func SaveIndexToPersistentMemory(idx *Index) (err error) {
-	f, err := os.Create(config.IndexFileDirectory + idx.Name + config.IndexFileExtension)
-	if err != nil {
-		log.Fatalln("could not create index file, err: ", err)
-		return err
-	}
+// append doc to a huuge list of all the docs added till now.
+// at time of restart, load all of these documents into the index
+// not the best way to go about it, but this is just a project to better understand distributed systems.
+func (idx *Index) StoreDocumentToDisk(doc *Document) {
 
-	defer f.Close()
-
-	// err = binary.Write(f, binary.LittleEndian, idx)
-
-	enc := gob.NewEncoder(f)
-	enc.Encode(idx)
-
-	// if err != nil {
-	// 	log.Fatalln("could not write index to disk, err: ", err.Error())
-	// }
-
-	log.Println("index saved")
-
-	return nil
 }
 
-func LoadIndexFromPersistentMemory(idxName string) (idx *Index, err error) {
+func (idx *Index) LoadDocumentsIntoIndex() (err error) {
+	reader := bufio.NewReader(idx.DocList)
 
-	f, err := os.Open(config.IndexFileDirectory + idx.Name + config.IndexFileExtension)
+	for {
+		docStr, err := reader.ReadString('\n')
+		if err == io.EOF {
+			if len(docStr) > 0 {
+				doc, err := CreateDocumentFromJSON(docStr)
+				if err != nil {
+					return err
+				}
+				idx.LoadDocument(doc)
+			}
+			break
+		}
 
-	if err != nil {
-		log.Fatalln("could not open index file, err: ", err)
-		return nil, err
+		if err != nil {
+			return err
+		}
+
+		doc, err := CreateDocumentFromJSON(docStr)
+		if err != nil {
+			return err
+		}
+		idx.LoadDocument(doc)
+
 	}
-	defer f.Close()
 
-	idx = &Index{}
+	log.Println("added docs to idx", idx.Name)
 
-	dec := gob.NewDecoder(f)
-	dec.Decode(&idx)
-
-	return idx, nil
+	return nil
 }

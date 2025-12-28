@@ -36,6 +36,7 @@ func CreateDocumentFromJSON(jsonString string) (doc *store.Document, err error) 
 		id++
 	}
 
+	doc.DocMap = obj
 	return doc, nil
 }
 

@@ -3,9 +3,7 @@ package store
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"gocene/config"
-	"log"
 	"os"
 	"sort"
 	"strings"
@@ -58,7 +56,10 @@ type segmentMeta struct {
 // Returns a new segment with given name, or error if file open unsuccessful
 func NewSegment(name string, parentIdx *Index) (*Segment, error) {
 
-	f, err := os.Create(config.SegmentDirectory + name + "_docs.bin")
+	// check if seg file already exists
+	f, err := os.OpenFile(config.IndexDataDirectory+"/"+parentIdx.Name+"/"+name, os.O_RDWR|os.O_CREATE, os.ModePerm)
+
+	// f, err := os.Create(config.IndexDataDirectory + "/" + parentIdx.Name + "/" + name)
 	if err != nil {
 		return nil, err
 	}
@@ -88,6 +89,62 @@ func NewActiveSegment(name string, parentIdx *Index) (a ActiveSegment, err error
 
 	return
 }
+
+// // Docs can only be added to an active segment to reduce locking while searching.
+// func (as *ActiveSegment) LoadDocument(doc *Document) (id int, err error) {
+
+// 	// log.Println("inside LoadDocument()")
+
+// 	if doc == nil {
+// 		log.Println("empty document given")
+// 		return 0, errors.New("empty document given")
+// 	}
+
+// 	as.Mutex.Lock()
+// 	defer as.Mutex.Unlock()
+
+// 	doc.ID = as.Seg.Metadata.docCount + 1
+
+// 	currByteOffset := as.Seg.Metadata.byteSize
+
+// 	// add doc to list
+// 	// encode doc to bin and write to end of file
+
+// 	jsonBytes, err := json.Marshal(doc.DocMap)
+// 	if err != nil {
+// 		log.Println("error marshalling, err :", err.Error())
+// 		return 0, err
+// 	}
+
+// 	// n, err := as.Seg.Docs.WriteAt(jsonBytes, int64(as.Seg.Metadata.byteSize))
+// 	// if err != nil {
+// 	// 	return 0, ErrDocFileWrite
+// 	// }
+
+// 	as.Seg.PostingsMap[doc.ID] = docPosition{
+// 		byteOffset: int(currByteOffset),
+// 		length:     len(jsonBytes),
+// 		tombstone:  false,
+// 	}
+
+// 	// update term dictionary
+// 	err = as.UpdateTermDictionary(doc)
+// 	if err != nil {
+// 		return 0, err
+// 	}
+
+// 	log.Println("term dictionary updated")
+
+// 	as.Seg.Metadata.docCount++
+// 	as.Seg.Metadata.byteSize += len(jsonBytes)
+
+// 	// fmt.Println("--------------------------TESTTSTSTSTSTSTSTS")
+// 	// buff := make([]byte, as.Seg.Metadata.byteSize)
+// 	// as.Seg.Docs.Read(buff)
+// 	// fmt.Println("active seg doc file content - ", buff)
+
+// 	return as.Seg.Metadata.docCount, nil
+// }
 
 // Docs can only be added to an active segment to reduce locking while searching.
 func (as *ActiveSegment) AddDocument(doc *Document) (id int, err error) {
@@ -128,7 +185,7 @@ func (as *ActiveSegment) AddDocument(doc *Document) (id int, err error) {
 		return 0, err
 	}
 
-	log.Println("term dictionary updated")
+	// log.Println("term dictionary updated")
 
 	as.Seg.Metadata.docCount++
 	as.Seg.Metadata.byteSize += n
@@ -189,13 +246,13 @@ func (as *ActiveSegment) UpdateTermDictionary(doc *Document) (err error) {
 // Currently uses only total frequency of all words as score to rank results.
 func (seg *Segment) SearchFullText(terms []Term) (res []RankedDoc, err error) {
 
-	log.Println("inside store seg SearchFullText()")
+	// log.Println("inside store seg SearchFullText()")
 
 	var allDocsMap map[int]RankedDoc = make(map[int]RankedDoc)
 
 	for _, term := range terms {
 		tempRes, err := seg.SearchTerm(term)
-		fmt.Println("found results for term: ", term, " - ", tempRes)
+		// fmt.Println("found results for term: ", term, " - ", tempRes)
 		if err != nil && err.Error() != "no documents contain given term" {
 			return nil, err
 		}
@@ -244,7 +301,7 @@ func (seg *Segment) SearchTerm(t Term) (res []RankedDoc, err error) {
 		freqs = append(freqs, freq)
 	}
 
-	fmt.Println("docnos: ", docnos)
+	// fmt.Println("docnos: ", docnos)
 
 	sort.SliceStable(docnos, func(i, j int) bool {
 		return freqs[i] > freqs[j]
@@ -269,7 +326,7 @@ func (seg *Segment) GetDocument(id int) (docJson string, err error) {
 	offset := seg.PostingsMap[id].byteOffset
 	length := seg.PostingsMap[id].length
 
-	fmt.Println("offset: ", offset, "length bytes: ", length)
+	// fmt.Println("offset: ", offset, "length bytes: ", length)
 
 	buff := make([]byte, length)
 	_, err = seg.Docs.ReadAt(buff, int64(offset))
