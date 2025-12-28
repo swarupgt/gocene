@@ -10,8 +10,9 @@ import (
 func Begin() {
 	log.Println("beginning service")
 
-	store.Init()
 	config.LoadEnv()
+
+	store.Init()
 
 	router := api.GetRouter()
 	router.SetEndpoints()
