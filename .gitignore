@@ -1,2 +1,3 @@
 index_files/
 app_test_data/*
+.env
