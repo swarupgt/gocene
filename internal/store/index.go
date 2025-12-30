@@ -45,6 +45,8 @@ func Init() {
 		return
 	}
 
+	var wg sync.WaitGroup
+
 	// make loading concurrent
 	for _, idxDocFile := range idxFiles {
 		tempIdx := NewIndex(idxDocFile.Name(), config.CaseSensitivity)
@@ -53,11 +55,15 @@ func Init() {
 			log.Fatalln("could not load index from doc list, err: ", err.Error())
 		}
 
-		err = tempIdx.LoadDocumentsIntoIndex()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err = tempIdx.LoadDocumentsIntoIndex()
 
-		if err != nil {
-			log.Fatalln("error loading documents into index ", tempIdx.Name)
-		}
+			if err != nil {
+				log.Fatalln("error loading documents into index ", tempIdx.Name)
+			}
+		}()
 
 		ActiveIndices[idxDocFile.Name()] = tempIdx
 	}
