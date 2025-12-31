@@ -1,15 +1,31 @@
 package store
 
 import (
-	"encoding/json"
 	"fmt"
 	"gocene/config"
+	"gocene/internal/utils"
 	"log"
 	"os"
 	"sync"
+
+	"github.com/minio/minio-go/v7"
 )
 
-var ActiveIndices map[string]*Index
+// var ActiveIndices map[string]*Index
+
+type Store struct {
+	ActiveIndices map[string]*Index
+	mc            *minio.Client
+}
+
+func New(mc *minio.Client) *Store {
+	s := &Store{
+		mc: mc,
+	}
+	s.Init()
+
+	return s
+}
 
 type Index struct {
 	Name     string
@@ -17,19 +33,33 @@ type Index struct {
 
 	DocList *os.File
 	// separate counter will make merging segments in the future easier
-	SegCount int
+	SegCount  int
+	NextDocID int
 
 	CaseSensitivity bool
 	Mutex           sync.RWMutex
 	As              ActiveSegment
+
+	mc *minio.Client
+}
+
+// for Raft snapshot loading
+type IndexMetadata struct {
+	Name        string
+	SegmentList []string
+	NextDocID   int
+
+	SegCount          int
+	CaseSensitivity   bool
+	ActiveSegmentName string
 }
 
 // load persistent indices here
-func Init() {
+func (s *Store) Init() {
 
 	// create directories for index files and segments if not present
 
-	ActiveIndices = make(map[string]*Index)
+	s.ActiveIndices = make(map[string]*Index)
 
 	os.MkdirAll(config.IndexDataDirectory, os.ModePerm)
 	os.MkdirAll(config.IndexDocListDirectory, os.ModePerm)
@@ -64,8 +94,8 @@ func Init() {
 				log.Fatalln("error loading documents into index ", tempIdx.Name)
 			}
 		}()
-
-		ActiveIndices[idxDocFile.Name()] = tempIdx
+		tempIdx.mc = s.mc
+		s.ActiveIndices[idxDocFile.Name()] = tempIdx
 	}
 
 	log.Println("idxs initialised :)")
@@ -97,14 +127,22 @@ func NewIndex(name string, cs bool) *Index {
 func (idx *Index) AddDocument(doc *Document) (id int, err error) {
 
 	// append doc to the list of idx docs
-	jsonDoc, _ := json.Marshal(doc.DocMap)
-	jsonDoc = append(jsonDoc, []byte("\n")...)
+	// jsonDoc, _ := json.Marshal(doc.DocMap)
 
-	_, err = idx.DocList.Write([]byte(jsonDoc))
+	err = utils.StoreDocumentToMinio(idx.mc, idx.NextDocID, doc.DocMap, idx.Name)
 	if err != nil {
-		log.Println("could not append doc to doc list for idx ", idx.Name)
-		return
+		return 0, err
 	}
+
+	idx.NextDocID++
+
+	// jsonDoc = append(jsonDoc, []byte("\n")...)
+
+	// _, err = idx.DocList.Write([]byte(jsonDoc))
+	// if err != nil {
+	// 	log.Println("could not append doc to doc list for idx ", idx.Name)
+	// 	return
+	// }
 
 	// if new index, create initial active segment
 	if idx.Segments == nil && idx.As.Seg == nil {

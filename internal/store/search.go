@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"gocene/internal/utils"
 	"log"
 	"sort"
 	"sync"
@@ -103,7 +104,8 @@ func (idx *Index) SearchFullText(terms []Term) (results []RankedResultDoc, err e
 
 	// get the json data for each scored and ranked doc
 	for _, iter := range res {
-		jsonStr, err := iter.ParentSeg.GetDocument(iter.DocID)
+		jsonStr, err := utils.GetDocumentFromMinio(idx.mc, iter.DocID, idx.Name)
+		// jsonStr, err := iter.ParentSeg.GetDocument(iter.DocID)
 		if err != nil {
 			log.Println("error getting document: ", err.Error())
 		}

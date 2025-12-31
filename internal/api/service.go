@@ -4,18 +4,39 @@ import (
 	"gocene/internal/store"
 	"gocene/internal/utils"
 	"log"
+
+	"github.com/minio/minio-go/v7"
 )
 
-// all api service functions here
+// all service functions here
 
 type Service struct {
+	st *store.Store
+
+	minioClient *minio.Client
+}
+
+func NewService() *Service {
+
+	s := &Service{}
+	var err error
+
+	s.minioClient, err = utils.CreateMinioClient()
+	if err != nil {
+		log.Fatalln("could not connect to minio server")
+	}
+
+	s.st = store.New(s.minioClient)
+
+	return s
+
 }
 
 // Creates a new index.
 func (s *Service) CreateIndex(inp CreateIndexInput) (res *CreateIndexResult, err error) {
 
 	// return err if same name exists
-	if _, ok := store.ActiveIndices[inp.Name]; ok {
+	if _, ok := s.st.ActiveIndices[inp.Name]; ok {
 		return nil, ErrIdxNameExists
 	}
 
@@ -27,7 +48,7 @@ func (s *Service) CreateIndex(inp CreateIndexInput) (res *CreateIndexResult, err
 	}
 
 	//add to active index after creating
-	store.ActiveIndices[inp.Name] = idx
+	s.st.ActiveIndices[inp.Name] = idx
 
 	res = &CreateIndexResult{
 		Success: true,
@@ -41,7 +62,7 @@ func (s *Service) GetIndices() (res *GetIndicesResult, err error) {
 
 	res = &GetIndicesResult{}
 
-	for idxName := range store.ActiveIndices {
+	for idxName := range s.st.ActiveIndices {
 		res.IndicesList = append(res.IndicesList, idxName)
 	}
 
@@ -55,7 +76,7 @@ func (s *Service) AddDocument(idxName string, inp AddDocumentInput) (res *AddDoc
 	var idx *store.Index
 	var ok bool
 
-	if idx, ok = store.ActiveIndices[idxName]; !ok {
+	if idx, ok = s.st.ActiveIndices[idxName]; !ok {
 		log.Println(ErrIdxDoesNotExist.Error())
 		//index does not exist
 		return nil, ErrIdxDoesNotExist
@@ -63,7 +84,7 @@ func (s *Service) AddDocument(idxName string, inp AddDocumentInput) (res *AddDoc
 
 	// create doc and add
 
-	doc, err := utils.CreateDocumentFromMap(inp.Data)
+	doc, err := store.CreateDocumentFromMap(inp.Data)
 	if err != nil {
 		return &AddDocumentResult{
 			Success: false,
@@ -120,13 +141,13 @@ func (s *Service) SearchFullText(idxName string, inp SearchInput) (res *SearchRe
 	var idx *store.Index
 	var ok bool
 
-	if idx, ok = store.ActiveIndices[idxName]; !ok {
+	if idx, ok = s.st.ActiveIndices[idxName]; !ok {
 		log.Println(ErrIdxDoesNotExist.Error())
 		// index does not exist
 		return nil, ErrIdxDoesNotExist
 	}
 
-	terms := utils.GetTermsFromPhrase(inp.SearchField, inp.SearchPhrase)
+	terms := store.GetTermsFromPhrase(inp.SearchField, inp.SearchPhrase)
 
 	rankedDocs, err := idx.SearchFullText(terms)
 	if err != nil {

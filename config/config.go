@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 )
@@ -16,6 +15,13 @@ var (
 	Port               string
 	ActiveSegmentCount int
 	CaseSensitivity    bool
+
+	MinioEndpoint  string
+	MinioAccessKey string
+	MinioSecretKey string
+	MinioBucket    string
+
+	MinioDocPathPrefix string = "/doc/"
 )
 
 func LoadEnv() {
@@ -27,5 +33,8 @@ func LoadEnv() {
 	ActiveSegmentCount, _ = strconv.Atoi(os.Getenv("MAX_SEGMENT_DOC_COUNT"))
 	CaseSensitivity, _ = strconv.ParseBool(os.Getenv("CASE_SENSITIVITY"))
 
-	fmt.Println("test vars", Port, ActiveSegmentCount, IndexDataDirectory)
+	MinioEndpoint = os.Getenv("MINIO_ENDPOINT")
+	MinioAccessKey = os.Getenv("MINIO_ACCESS_KEY")
+	MinioSecretKey = os.Getenv("MINIO_SECRET_KEY")
+	MinioBucket = os.Getenv("MINIO_BUCKET")
 }

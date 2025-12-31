@@ -11,11 +11,13 @@ import (
 // all api controller functions here
 
 type Controller struct {
-	serv Service
+	serv *Service
 }
 
 func NewController() (cont *Controller) {
-	return &Controller{}
+	return &Controller{
+		serv: NewService(),
+	}
 }
 
 func (c *Controller) CreateIndex(ctx *gin.Context) (status int) {

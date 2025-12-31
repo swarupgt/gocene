@@ -3,7 +3,6 @@ package cmd
 import (
 	"gocene/config"
 	"gocene/internal/api"
-	"gocene/internal/store"
 	"log"
 )
 
@@ -11,8 +10,6 @@ func Begin() {
 	log.Println("beginning service")
 
 	config.LoadEnv()
-
-	store.Init()
 
 	router := api.GetRouter()
 	router.SetEndpoints()

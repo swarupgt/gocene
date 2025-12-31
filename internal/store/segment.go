@@ -23,9 +23,17 @@ type Segment struct {
 	ByteSize int
 }
 
+// for Raft snapshot loading
 type SegmentMetadata struct {
+	IsActive bool
 	Name     string
 	TermDict TermDictionary
+
+	ParentIdxName string
+	PostingsMap   map[int]docPosition
+	DocsPath      string
+	DocCount      int
+	ByteSize      int
 }
 
 type ActiveSegment struct {
@@ -52,11 +60,6 @@ type docPosition struct {
 	byteOffset int
 	length     int
 	tombstone  bool
-}
-
-type segmentMeta struct {
-	docCount int
-	byteSize int
 }
 
 // Returns a new segment with given name, or error if file open unsuccessful
