@@ -71,10 +71,7 @@ func GetTermsFromPhrase(field, phrase string) (terms []store.Term) {
 	// Split the search phrase into terms
 	strs := strings.Split(phrase, " ")
 	for _, str := range strs {
-		term := store.Term{
-			Field: field,
-			Value: str,
-		}
+		term := store.NewTerm(field, str)
 		terms = append(terms, term)
 	}
 

@@ -19,7 +19,13 @@ type Segment struct {
 	PostingsMap map[int]docPosition
 
 	Docs     *os.File
-	Metadata segmentMeta
+	DocCount int
+	ByteSize int
+}
+
+type SegmentMetadata struct {
+	Name     string
+	TermDict TermDictionary
 }
 
 type ActiveSegment struct {
@@ -70,10 +76,8 @@ func NewSegment(name string, parentIdx *Index) (*Segment, error) {
 		Docs:        f,
 		ParentIdx:   parentIdx,
 		PostingsMap: make(map[int]docPosition),
-		Metadata: segmentMeta{
-			docCount: 0,
-			byteSize: 0,
-		},
+		DocCount:    0,
+		ByteSize:    0,
 	}, nil
 
 }
@@ -156,9 +160,9 @@ func (as *ActiveSegment) AddDocument(doc *Document) (id int, err error) {
 	as.Mutex.Lock()
 	defer as.Mutex.Unlock()
 
-	doc.ID = as.Seg.Metadata.docCount + 1
+	doc.ID = as.Seg.DocCount + 1
 
-	currByteOffset := as.Seg.Metadata.byteSize
+	currByteOffset := as.Seg.ByteSize
 
 	// add doc to list
 	// encode doc to bin and write to end of file
@@ -187,9 +191,9 @@ func (as *ActiveSegment) AddDocument(doc *Document) (id int, err error) {
 
 	// log.Println("term dictionary updated")
 
-	as.Seg.Metadata.docCount++
-	as.Seg.Metadata.byteSize += n
-	return as.Seg.Metadata.docCount, nil
+	as.Seg.DocCount++
+	as.Seg.ByteSize += n
+	return as.Seg.DocCount, nil
 }
 
 // Update active segment's term dictionary
@@ -212,10 +216,7 @@ func (as *ActiveSegment) UpdateTermDictionary(doc *Document) (err error) {
 		}
 
 		for _, token := range tokens {
-			t := Term{
-				Field: f.Name,
-				Value: token,
-			}
+			t := NewTerm(f.Name, token)
 
 			// Check if TermData available for the given term
 			if _, exists := as.Seg.TermDict.dict[t]; !exists {
