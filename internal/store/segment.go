@@ -5,6 +5,7 @@ import (
 	"errors"
 	"gocene/config"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -24,17 +25,17 @@ type Segment struct {
 }
 
 // for Raft snapshot loading
-type SegmentMetadata struct {
-	IsActive bool
-	Name     string
-	TermDict TermDictionary
+// type SegmentMetadata struct {
+// 	IsActive bool
+// 	Name     string
+// 	TermDict TermDictionary
 
-	ParentIdxName string
-	PostingsMap   map[int]docPosition
-	DocsPath      string
-	DocCount      int
-	ByteSize      int
-}
+// 	ParentIdxName string
+// 	PostingsMap   map[int]docPosition
+// 	DocsPath      string
+// 	DocCount      int
+// 	ByteSize      int
+// }
 
 type ActiveSegment struct {
 	Seg   *Segment
@@ -66,7 +67,8 @@ type docPosition struct {
 func NewSegment(name string, parentIdx *Index) (*Segment, error) {
 
 	// check if seg file already exists
-	f, err := os.OpenFile(config.IndexDataDirectory+"/"+parentIdx.Name+"/"+name, os.O_RDWR|os.O_CREATE, os.ModePerm)
+	path := filepath.Join(config.IndexDataDirectory, parentIdx.Name, name)
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, os.ModePerm)
 
 	// f, err := os.Create(config.IndexDataDirectory + "/" + parentIdx.Name + "/" + name)
 	if err != nil {
@@ -238,14 +240,6 @@ func (as *ActiveSegment) UpdateTermDictionary(doc *Document) (err error) {
 	return nil
 }
 
-// // Only the active segment is locked since it is mutable.
-// func (as *ActiveSegment) SearchFullText(terms []Term) (res []RankedDoc, err error) {
-// 	as.Mutex.RLock()
-// 	defer as.Mutex.RUnlock()
-
-// 	return as.Seg.SearchFullText(terms)
-// }
-
 // Future - Use relative positions of terms to rank better.
 // Currently uses only total frequency of all words as score to rank results.
 func (seg *Segment) SearchFullText(terms []Term) (res []RankedDoc, err error) {
@@ -289,7 +283,7 @@ func (seg *Segment) SearchFullText(terms []Term) (res []RankedDoc, err error) {
 	return
 }
 
-// Need not lock
+// Search for a single term in a segment
 func (seg *Segment) SearchTerm(t Term) (res []RankedDoc, err error) {
 
 	td, found := seg.TermDict.dict[t]

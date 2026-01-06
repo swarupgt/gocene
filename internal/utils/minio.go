@@ -48,6 +48,8 @@ func CreateMinioClient() (mc *minio.Client, err error) {
 	return
 }
 
+// Store document to S3 bucket.
+// Only leader writes, so no consistency issues.
 func StoreDocumentToMinio(mc *minio.Client, docID int, doc map[string]interface{}, indexName string) (err error) {
 
 	if mc == nil {
@@ -82,6 +84,7 @@ func StoreDocumentToMinio(mc *minio.Client, docID int, doc map[string]interface{
 	return
 }
 
+// Get document from S3 bucket.
 func GetDocumentFromMinio(mc *minio.Client, docID int, indexName string) (docStr string, err error) {
 
 	ctx := context.Background()

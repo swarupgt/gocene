@@ -10,6 +10,8 @@ const (
 	// GetIndexDetailsAPI
 	SearchFullTextAPI
 	// SearchTermAPI
+	JoinAPI
+	StatusAPI
 )
 
 var (
@@ -23,5 +25,7 @@ var (
 		// GetIndexDetailsAPI: "/:idx_name",
 		SearchFullTextAPI: "/:idx_name/search",
 		// SearchTermAPI:      "/:idx_name/search_term",
+		JoinAPI:   "/join",
+		StatusAPI: "/status",
 	}
 )

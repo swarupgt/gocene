@@ -18,9 +18,6 @@ func NewDocument() *Document {
 }
 
 func (doc *Document) AddField(f Field) {
-
-	// fmt.Println("field in doc: ", f.Name)
-
 	doc.Fields = append(doc.Fields, f)
 }
 

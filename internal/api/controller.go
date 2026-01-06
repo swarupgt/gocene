@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// all api controller functions here
+// all HTTP API controller functions here
 
 type Controller struct {
 	serv *Service
@@ -20,6 +20,7 @@ func NewController() (cont *Controller) {
 	}
 }
 
+// Create Index HTTP func
 func (c *Controller) CreateIndex(ctx *gin.Context) (status int) {
 	//bind query
 	var inp CreateIndexInput
@@ -33,7 +34,7 @@ func (c *Controller) CreateIndex(ctx *gin.Context) (status int) {
 	if err != nil {
 		//server error, log
 		log.Println(err)
-		if err == ErrIdxNameExists {
+		if err == store.ErrIdxNameExists {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "index name already exists"})
 			return http.StatusBadRequest
 		}
@@ -46,6 +47,7 @@ func (c *Controller) CreateIndex(ctx *gin.Context) (status int) {
 
 }
 
+// Get Indices HTTP
 func (c *Controller) GetIndices(ctx *gin.Context) (status int) {
 
 	res, err := c.serv.GetIndices()
@@ -58,7 +60,7 @@ func (c *Controller) GetIndices(ctx *gin.Context) (status int) {
 	return http.StatusOK
 }
 
-// add doc
+// Add Document HTTP
 func (c *Controller) AddDocument(ctx *gin.Context) (status int) {
 
 	log.Println("inside cont AddDocument()")
@@ -79,7 +81,7 @@ func (c *Controller) AddDocument(ctx *gin.Context) (status int) {
 	res, err := c.serv.AddDocument(idx, inp)
 	if err != nil {
 		log.Println("Error adding document: ", err.Error())
-		if err == ErrIdxDoesNotExist {
+		if err == store.ErrIdxDoesNotExist {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "index specified does not exist"})
 			return http.StatusBadRequest
 		} else {
@@ -92,9 +94,7 @@ func (c *Controller) AddDocument(ctx *gin.Context) (status int) {
 	return http.StatusOK
 }
 
-// modify doc
-
-// get doc (all docs too)
+// Get Document HTTP
 func (c *Controller) GetDocument(ctx *gin.Context) (status int) {
 	log.Println("inside cont GetDocument()")
 
@@ -113,7 +113,7 @@ func (c *Controller) GetDocument(ctx *gin.Context) (status int) {
 
 	res, err := c.serv.GetDocument(idx, inp)
 	if err != nil {
-		if err == ErrIdxDoesNotExist {
+		if err == store.ErrIdxDoesNotExist {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "index specified does not exist"})
 			return http.StatusBadRequest
 		} else if err == store.ErrDocumentNotFound {
@@ -129,7 +129,7 @@ func (c *Controller) GetDocument(ctx *gin.Context) (status int) {
 	return http.StatusOK
 }
 
-// search full text
+// Search Full Text HTTP
 func (c *Controller) SearchFullText(ctx *gin.Context) (status int) {
 	log.Println("inside cont SearchFullText()")
 
@@ -148,13 +148,43 @@ func (c *Controller) SearchFullText(ctx *gin.Context) (status int) {
 
 	res, err := c.serv.SearchFullText(idx, inp)
 	if err != nil {
-		if err == ErrIdxDoesNotExist {
+		if err == store.ErrIdxDoesNotExist {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "index specified does not exist"})
 			return http.StatusBadRequest
 		} else {
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "something went wrong"})
 			return http.StatusInternalServerError
 		}
+	}
+
+	ctx.JSON(http.StatusOK, res)
+	return http.StatusOK
+}
+
+func (c *Controller) Join(ctx *gin.Context) (status int) {
+
+	var inp JoinInput
+	if err := ctx.BindJSON(&inp); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "incorrect join structure"})
+		return http.StatusBadRequest
+	}
+
+	err := c.serv.Join(inp)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return http.StatusInternalServerError
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"Success": true})
+	return http.StatusOK
+}
+
+func (c *Controller) Status(ctx *gin.Context) (status int) {
+
+	res, err := c.serv.Status()
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return http.StatusInternalServerError
 	}
 
 	ctx.JSON(http.StatusOK, res)

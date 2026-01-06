@@ -4,7 +4,7 @@ import (
 	"gocene/internal/store"
 )
 
-// input structs
+// All the HTTP types here
 
 type CreateIndexInput struct {
 	Name            string `json:"name" binding:"required"`
@@ -16,7 +16,6 @@ type AddDocumentInput struct {
 	Data map[string]interface{}
 }
 
-// result structs
 type CreateIndexResult struct {
 	Success bool `json:"success"`
 }
@@ -48,3 +47,10 @@ type SearchResult struct {
 	Results []store.RankedResultDoc `json:"results"`
 	Count   int                     `json:"count"`
 }
+
+type JoinInput struct {
+	NodeID  string `json:"node_id"`
+	Address string `json:""`
+}
+
+type StatusResult store.StatusResult

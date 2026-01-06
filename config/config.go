@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"time"
 )
 
 var (
@@ -21,7 +22,13 @@ var (
 	MinioSecretKey string
 	MinioBucket    string
 
-	MinioDocPathPrefix string = "/doc/"
+	// raft config
+	RaftBootstrap   bool
+	RaftJoinAddress string
+
+	MinioDocPathPrefix string = "/docs/"
+
+	RaftTimeout time.Duration = 10 * time.Second
 )
 
 func LoadEnv() {
@@ -37,4 +44,7 @@ func LoadEnv() {
 	MinioAccessKey = os.Getenv("MINIO_ACCESS_KEY")
 	MinioSecretKey = os.Getenv("MINIO_SECRET_KEY")
 	MinioBucket = os.Getenv("MINIO_BUCKET")
+
+	RaftBootstrap, _ = strconv.ParseBool(os.Getenv("GOCENE_BOOTSTRAP"))
+	RaftJoinAddress = os.Getenv("GOCENE_JOIN_ADDRESS")
 }

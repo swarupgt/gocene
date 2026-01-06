@@ -53,6 +53,14 @@ func (router *Router) SetEndpoints() {
 			router.R.POST(endpoint, func(ctx *gin.Context) {
 				router.Cont.SearchFullText(ctx)
 			})
+		} else if apiId == config.JoinAPI {
+			router.R.POST(endpoint, func(ctx *gin.Context) {
+				router.Cont.Join(ctx)
+			})
+		} else if apiId == config.StatusAPI {
+			router.R.POST(endpoint, func(ctx *gin.Context) {
+				router.Cont.Status(ctx)
+			})
 		}
 	}
 }

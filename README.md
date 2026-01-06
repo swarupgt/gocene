@@ -10,14 +10,14 @@ You can currently -
 1. create index
 2. add documents
 3. search full text
-4. get a document
+<!--4. get a document-->
 
 Search only supports a single field for now :/ It's a simple engine, using only the frequency of words as the score (lol). 
 
 API Documentation -> [HERE](./API.md)
 
 ## TODO
+- explicit node joining as part of raft logs
 - remove useless passthroughs like the API service/controller 
-- add top k functionality, and top k results in search doesn't need sorting again
-- tests 
-- replication for durability
+- td-idf for ranking
+- tests
