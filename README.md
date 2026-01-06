@@ -1,5 +1,5 @@
 # gocene
-A distributed search engine in Go, inspired by Apache Lucene (kinda). I plan to integrate it with Kubernetes.
+A Raft-backed distributed search engine in Go, inspired by Apache Lucene (kinda). I plan to integrate it with Kubernetes.
 
 ## Design
 
