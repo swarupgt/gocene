@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"gocene/config"
 	"io"
 	"log"
@@ -53,7 +54,6 @@ func CreateMinioClient() (mc *minio.Client, err error) {
 func StoreDocumentToMinio(mc *minio.Client, docID int, doc map[string]interface{}, indexName string) (err error) {
 
 	if mc == nil {
-		log.Println("no minio client passed")
 		return errors.New("no minio client passed")
 	}
 
@@ -86,6 +86,10 @@ func StoreDocumentToMinio(mc *minio.Client, docID int, doc map[string]interface{
 
 // Get document from S3 bucket.
 func GetDocumentFromMinio(mc *minio.Client, docID int, indexName string) (docStr string, err error) {
+
+	if mc == nil {
+		return "", fmt.Errorf("minio client nil")
+	}
 
 	ctx := context.Background()
 

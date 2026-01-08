@@ -25,8 +25,11 @@ var (
 	// raft config
 	RaftBootstrap   bool
 	RaftJoinAddress string
+	RaftId          string
+	RaftAddress     string
+	RaftDirectory   string
 
-	MinioDocPathPrefix string = "/docs/"
+	MinioDocPathPrefix string = "/docs"
 
 	RaftTimeout time.Duration = 10 * time.Second
 )
@@ -46,5 +49,9 @@ func LoadEnv() {
 	MinioBucket = os.Getenv("MINIO_BUCKET")
 
 	RaftBootstrap, _ = strconv.ParseBool(os.Getenv("GOCENE_BOOTSTRAP"))
-	RaftJoinAddress = os.Getenv("GOCENE_JOIN_ADDRESS")
+	RaftJoinAddress = os.Getenv("RAFT_JOIN_ADDRESS")
+	RaftId = os.Getenv("RAFT_NODE_ID")
+	RaftAddress = os.Getenv("RAFT_NODE_ADDRESS")
+	RaftDirectory = os.Getenv("RAFT_DIRECTORY")
+
 }

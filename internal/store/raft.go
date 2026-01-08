@@ -3,6 +3,7 @@ package store
 import (
 	"encoding/json"
 	"fmt"
+	cfg "gocene/config"
 	"gocene/internal/utils"
 	"io"
 	"log"
@@ -15,10 +16,9 @@ import (
 	raftboltdb "github.com/hashicorp/raft-boltdb"
 )
 
-const SnapshotCount = 2
-
 // This file contains all the raft related functionality for Store.
-//
+
+const SnapshotCount = 2
 
 // fsmSnapshot stores the entire Store metadata in one object for Raft snapshotting.
 type fsmSnapshot struct {
@@ -46,9 +46,9 @@ type SegmentMetadata struct {
 	ByteSize      int                 `json:"byte_size"`
 }
 
-func (s *Store) Open(enableSingle bool, localID string) error {
+func (s *Store) Open() error {
 	config := raft.DefaultConfig()
-	config.LocalID = raft.ServerID(localID)
+	config.LocalID = raft.ServerID(cfg.RaftId)
 
 	addr, err := net.ResolveTCPAddr("tcp", s.RaftBind)
 	if err != nil {
@@ -82,8 +82,15 @@ func (s *Store) Open(enableSingle bool, localID string) error {
 	}
 	s.Raft = ra
 
-	// check if no raft data on disk
-	if enableSingle {
+	dirs, err := os.ReadDir(cfg.RaftDirectory)
+	if err != nil {
+		log.Fatalln("could not read raft dir, err: ", err.Error())
+	}
+
+	fmt.Println("BOOTSTRAP AND dir: ", cfg.RaftBootstrap, dirs)
+
+	// check if no raft data on disk, only then bootstrap
+	if cfg.RaftBootstrap {
 		configuration := raft.Configuration{
 			Servers: []raft.Server{
 				{
@@ -93,6 +100,8 @@ func (s *Store) Open(enableSingle bool, localID string) error {
 			},
 		}
 		ra.BootstrapCluster(configuration)
+	} else {
+		// join cluster at join address
 	}
 
 	return nil
@@ -145,11 +154,11 @@ func (f *fsm) ApplyAddDocument(idxName string, docID int) interface{} {
 // Applying creating an index to the FSM Store
 func (f *fsm) ApplyCreateIndex(idxName string, cs int) error {
 
-	if _, ok := f.ActiveIndices[idxName]; !ok {
+	if _, ok := f.ActiveIndices[idxName]; ok {
 		return ErrIdxNameExists
 	}
 
-	f.ActiveIndices[idxName] = NewIndex(idxName, cs == 1)
+	f.ActiveIndices[idxName] = NewIndex(idxName, cs == 1, f.mc)
 	return nil
 }
 
@@ -178,9 +187,9 @@ func (f *fsm) Snapshot() (raft.FSMSnapshot, error) {
 				Name:          seg.Name,
 				TermDict:      seg.TermDict,
 				ParentIdxName: idx.Name,
-				PostingsMap:   seg.PostingsMap,
-				DocCount:      seg.DocCount,
-				ByteSize:      seg.ByteSize,
+				// PostingsMap:   seg.PostingsMap,
+				DocCount: seg.DocCount,
+				ByteSize: seg.ByteSize,
 			}
 
 			idxMd.SegmentList = append(idxMd.SegmentList, segMd)
@@ -191,9 +200,9 @@ func (f *fsm) Snapshot() (raft.FSMSnapshot, error) {
 			Name:          idx.As.Seg.Name,
 			TermDict:      idx.As.Seg.TermDict,
 			ParentIdxName: idx.Name,
-			PostingsMap:   idx.As.Seg.PostingsMap,
-			DocCount:      idx.As.DocCount,
-			ByteSize:      idx.As.Seg.ByteSize,
+			// PostingsMap:   idx.As.Seg.PostingsMap,
+			DocCount: idx.As.DocCount,
+			ByteSize: idx.As.Seg.ByteSize,
 		})
 
 		fSnap.ActiveIndices = append(fSnap.ActiveIndices, idxMd)
@@ -212,7 +221,7 @@ func (f *fsm) Restore(rc io.ReadCloser) error {
 	}
 
 	for _, idxMd := range fSnap.ActiveIndices {
-		tempIdx := NewIndex(idxMd.Name, idxMd.CaseSensitivity)
+		tempIdx := NewIndex(idxMd.Name, idxMd.CaseSensitivity, f.mc)
 		for _, segMd := range idxMd.SegmentList {
 
 			// if immutable segments, append to seg list
@@ -223,7 +232,7 @@ func (f *fsm) Restore(rc io.ReadCloser) error {
 					return err
 				}
 				tempSeg.TermDict = segMd.TermDict
-				tempSeg.PostingsMap = segMd.PostingsMap
+				// tempSeg.PostingsMap = segMd.PostingsMap
 				tempSeg.DocCount = segMd.DocCount
 				tempSeg.ByteSize = segMd.ByteSize
 			} else {
@@ -233,12 +242,19 @@ func (f *fsm) Restore(rc io.ReadCloser) error {
 					return err
 				}
 				tempAsSeg.Seg.TermDict = segMd.TermDict
-				tempAsSeg.Seg.PostingsMap = segMd.PostingsMap
+				// tempAsSeg.Seg.PostingsMap = segMd.PostingsMap
 				tempAsSeg.Seg.DocCount = segMd.DocCount
 				tempAsSeg.DocCount = segMd.DocCount
 				tempAsSeg.Seg.ByteSize = segMd.ByteSize
 			}
 		}
+	}
+
+	var err error
+	f.mc, err = utils.CreateMinioClient()
+	if err != nil {
+		log.Fatalln("could not create minio client, err: ", err.Error())
+		return err
 	}
 
 	return nil
@@ -269,8 +285,3 @@ func (fs fsmSnapshot) Persist(sink raft.SnapshotSink) error {
 }
 
 func (fs fsmSnapshot) Release() {}
-
-// Join request
-// if not leader, give leader address. else add raft log of
-
-// status request

@@ -47,7 +47,7 @@ func (s *Service) CreateIndex(inp CreateIndexInput) (res *CreateIndexResult, err
 	}
 
 	return &CreateIndexResult{
-		Success: err != nil,
+		Success: err == nil,
 	}, err
 }
 
@@ -76,7 +76,7 @@ func (s *Service) AddDocument(idxName string, inp AddDocumentInput) (res *AddDoc
 
 	return &AddDocumentResult{
 		DocID:   docId,
-		Success: err != nil,
+		Success: err == nil,
 	}, err
 
 }

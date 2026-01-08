@@ -26,31 +26,18 @@ type Index struct {
 	mc *minio.Client
 }
 
-func NewIndex(name string, cs bool) *Index {
+func NewIndex(name string, cs bool, mc *minio.Client) *Index {
 	temp := &Index{
 		Name:            name,
 		Segments:        nil,
 		CaseSensitivity: cs,
+		mc:              mc,
 	}
-	var err error
-	temp.DocList, err = os.OpenFile(config.IndexDocListDirectory+name, os.O_CREATE|os.O_APPEND|os.O_RDWR, os.ModePerm)
-
-	if err != nil {
-		log.Fatalln("could not open file for idx doc list, err: ", err.Error())
-	}
-
-	err = os.MkdirAll(config.IndexDataDirectory+"/"+temp.Name, os.ModePerm)
-	if err != nil {
-		log.Panicln("could not create index, err: ", err.Error())
-	}
-
 	return temp
 }
 
 // Needs to use mutex to handle concurrent events for index.
 func (idx *Index) AddDocument(doc *Document) (id int, err error) {
-
-	idx.NextDocID++
 
 	// if new index, create initial active segment
 	if idx.Segments == nil && idx.As.Seg == nil {
@@ -61,6 +48,7 @@ func (idx *Index) AddDocument(doc *Document) (id int, err error) {
 		}
 	}
 
+	doc.ID = idx.NextDocID
 	id, err = idx.As.AddDocument(doc)
 
 	// add to segments if active segment full
@@ -72,6 +60,7 @@ func (idx *Index) AddDocument(doc *Document) (id int, err error) {
 		}
 	}
 
+	idx.NextDocID++
 	return
 }
 

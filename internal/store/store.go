@@ -1,12 +1,10 @@
 package store
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"gocene/config"
 	"gocene/internal/utils"
-	"io"
 	"log"
 	"sync"
 
@@ -53,12 +51,28 @@ func New(mc *minio.Client) *Store {
 
 func (s *Store) Init() {
 	// if bootstrap, become leader. else join using join address
+	s.RaftBind = config.RaftAddress
+	s.RaftDir = config.RaftDirectory
+
+	fmt.Println("--------MINIO IS NIL??-----", s.mc == nil)
+
+	s.ActiveIndices = make(map[string]*Index)
+
+	err := s.Open()
+	if err != nil {
+		log.Fatalln("could not create a new store, err: ", err.Error())
+	}
+
 }
 
 func (s *Store) AddDocument(idxName string, docData map[string]any) (docId int, err error) {
 
 	if s.Raft.State() != raft.Leader {
 		return 0, ErrNotLeader
+	}
+
+	if _, ok := s.ActiveIndices[idxName]; !ok {
+		return 0, ErrIdxDoesNotExist
 	}
 
 	// store docto S3
@@ -83,7 +97,21 @@ func (s *Store) AddDocument(idxName string, docData map[string]any) (docId int, 
 
 	f := s.Raft.Apply(b, config.RaftTimeout)
 
-	return c.Param, f.Error()
+	if f.Error() != nil {
+		return 0, f.Error()
+	}
+
+	if resp := f.Response(); resp != nil {
+		if ferr, ok := resp.(error); ok {
+			return 0, ferr
+		}
+
+		if docid, ok := resp.(int); ok {
+			return docid, nil
+		}
+	}
+
+	return 0, fmt.Errorf("nil response from FSM")
 }
 
 func (s *Store) CreateIndex(idxName string, cs bool) (err error) {
@@ -113,41 +141,52 @@ func (s *Store) CreateIndex(idxName string, cs bool) (err error) {
 
 	f := s.Raft.Apply(b, config.RaftTimeout)
 
-	return f.Error()
-}
-
-func (idx *Index) LoadDocumentsIntoIndex() (err error) {
-	reader := bufio.NewReader(idx.DocList)
-
-	for {
-		docStr, err := reader.ReadString('\n')
-		if err == io.EOF {
-			if len(docStr) > 0 {
-				doc, err := CreateDocumentFromJSON(docStr)
-				if err != nil {
-					return err
-				}
-				idx.LoadDocument(doc)
-			}
-			break
-		}
-
-		if err != nil {
-			return err
-		}
-
-		doc, err := CreateDocumentFromJSON(docStr)
-		if err != nil {
-			return err
-		}
-		idx.LoadDocument(doc)
-
+	if f.Error() != nil {
+		return f.Error()
 	}
 
-	log.Println("added docs to idx", idx.Name)
+	if resp := f.Response(); resp != nil {
+		if ferr, ok := resp.(error); ok {
+			return ferr
+		}
+		return fmt.Errorf("unexpected response from FSM: %T", resp)
+	}
 
 	return nil
 }
+
+// func (idx *Index) LoadDocumentsIntoIndex() (err error) {
+// 	reader := bufio.NewReader(idx.DocList)
+
+// 	for {
+// 		docStr, err := reader.ReadString('\n')
+// 		if err == io.EOF {
+// 			if len(docStr) > 0 {
+// 				doc, err := CreateDocumentFromJSON(docStr)
+// 				if err != nil {
+// 					return err
+// 				}
+// 				idx.LoadDocument(doc)
+// 			}
+// 			break
+// 		}
+
+// 		if err != nil {
+// 			return err
+// 		}
+
+// 		doc, err := CreateDocumentFromJSON(docStr)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		idx.LoadDocument(doc)
+
+// 	}
+
+// 	log.Println("added docs to idx", idx.Name)
+
+// 	return nil
+// }
 
 // Join request
 // Assumes the leader request redirection if not leader has been handled in the service.
@@ -224,54 +263,3 @@ func (s *Store) Status() (StatusResult, error) {
 
 	return status, nil
 }
-
-// func (s *Store) Init() {
-
-// 	// if bootstrap set and raftdir empty, then become leader
-// 	//
-// 	// if bootstrap is false, join
-
-// 	// create directories for index files and segments if not present
-
-// 	s.ActiveIndices = make(map[string]*Index)
-
-// 	os.MkdirAll(config.IndexDataDirectory, os.ModePerm)
-// 	os.MkdirAll(config.IndexDocListDirectory, os.ModePerm)
-
-// 	// load all files from doc list folder into index
-// 	idxFiles, err := os.ReadDir(config.IndexDocListDirectory)
-// 	if err != nil {
-// 		log.Fatalln("could not read index dir, err: ", err.Error())
-// 	}
-
-// 	if len(idxFiles) == 0 {
-// 		log.Println("no idxs to load, initialised")
-// 		return
-// 	}
-
-// 	var wg sync.WaitGroup
-
-// 	// make loading concurrent
-// 	for _, idxDocFile := range idxFiles {
-// 		tempIdx := NewIndex(idxDocFile.Name(), config.CaseSensitivity)
-
-// 		if err != nil {
-// 			log.Fatalln("could not load index from doc list, err: ", err.Error())
-// 		}
-
-// 		wg.Add(1)
-// 		go func() {
-// 			defer wg.Done()
-// 			err = tempIdx.LoadDocumentsIntoIndex()
-
-// 			if err != nil {
-// 				log.Fatalln("error loading documents into index ", tempIdx.Name)
-// 			}
-// 		}()
-// 		tempIdx.mc = s.mc
-// 		s.ActiveIndices[idxDocFile.Name()] = tempIdx
-// 	}
-
-// 	log.Println("idxs initialised :)")
-
-// }
