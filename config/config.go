@@ -23,11 +23,12 @@ var (
 	MinioBucket    string
 
 	// raft config
-	RaftBootstrap   bool
-	RaftJoinAddress string
-	RaftId          string
-	RaftAddress     string
-	RaftDirectory   string
+	RaftBootstrap       bool
+	RaftJoinAddress     string
+	RaftId              string
+	RaftAddress         string
+	RaftDirectory       string
+	RaftSelfHTTPAddress string
 
 	MinioDocPathPrefix string = "/docs"
 
@@ -53,5 +54,6 @@ func LoadEnv() {
 	RaftId = os.Getenv("RAFT_NODE_ID")
 	RaftAddress = os.Getenv("RAFT_NODE_ADDRESS")
 	RaftDirectory = os.Getenv("RAFT_DIRECTORY")
+	RaftSelfHTTPAddress = os.Getenv("RAFT_SELF_HTTP_ADDRESS")
 
 }

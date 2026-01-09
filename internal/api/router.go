@@ -58,7 +58,7 @@ func (router *Router) SetEndpoints() {
 				router.Cont.Join(ctx)
 			})
 		} else if apiId == config.StatusAPI {
-			router.R.POST(endpoint, func(ctx *gin.Context) {
+			router.R.GET(endpoint, func(ctx *gin.Context) {
 				router.Cont.Status(ctx)
 			})
 		}

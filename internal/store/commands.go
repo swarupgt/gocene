@@ -5,7 +5,7 @@ package store
 const (
 	CmdCreateIndex = iota
 	CmdAddDocument
-	// CmdAddNode
+	CmdAddNode
 	// CmdRemoveNode
 )
 
@@ -15,4 +15,8 @@ type Command struct {
 	CmdId   int
 	IdxName string
 	Param   int
+
+	// peer info when new node joins
+	NodeAddress     string
+	NodeHTTPAddress string
 }

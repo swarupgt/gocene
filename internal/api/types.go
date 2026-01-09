@@ -17,7 +17,8 @@ type AddDocumentInput struct {
 }
 
 type CreateIndexResult struct {
-	Success bool `json:"success"`
+	Success bool   `json:"success,omitempty"`
+	Error   string `json:"error,omitempty"`
 }
 
 type GetIndicesResult struct {
@@ -25,8 +26,9 @@ type GetIndicesResult struct {
 }
 
 type AddDocumentResult struct {
-	DocID   int  `json:"doc_id,omitempty"`
-	Success bool `json:"success"`
+	DocID   int    `json:"doc_id,omitempty"`
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
 }
 
 type GetDocumentInput struct {
@@ -49,8 +51,13 @@ type SearchResult struct {
 }
 
 type JoinInput struct {
-	NodeID  string `json:"node_id"`
-	Address string `json:""`
+	NodeID      string `json:"node_id"`
+	Address     string `json:"node_address"`
+	HTTPAddress string `json:"http_address"`
+}
+
+type JoinResult struct {
+	LeaderHTTPAddress string `json:"leader_http_address"`
 }
 
 type StatusResult store.StatusResult

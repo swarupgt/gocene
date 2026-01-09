@@ -169,13 +169,13 @@ func (c *Controller) Join(ctx *gin.Context) (status int) {
 		return http.StatusBadRequest
 	}
 
-	err := c.serv.Join(inp)
+	res, err := c.serv.Join(inp)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return http.StatusInternalServerError
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"Success": true})
+	ctx.JSON(http.StatusOK, res)
 	return http.StatusOK
 }
 

@@ -46,6 +46,7 @@ type SegmentMetadata struct {
 	ByteSize      int                 `json:"byte_size"`
 }
 
+// Instantiates the raft configs for the node, and bootstraps if it's the first node to start
 func (s *Store) Open() error {
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(cfg.RaftId)
@@ -58,6 +59,14 @@ func (s *Store) Open() error {
 	if err != nil {
 		return err
 	}
+
+	os.MkdirAll(cfg.RaftDirectory, os.ModePerm)
+	dirs, err := os.ReadDir(cfg.RaftDirectory)
+	if err != nil {
+		log.Fatalln("could not read raft dir, err: ", err.Error())
+	}
+
+	isEmptyRaftDirAtStartup := len(dirs) == 0
 
 	snapshots, err := raft.NewFileSnapshotStore(s.RaftDir, SnapshotCount, os.Stderr)
 	if err != nil {
@@ -82,15 +91,9 @@ func (s *Store) Open() error {
 	}
 	s.Raft = ra
 
-	dirs, err := os.ReadDir(cfg.RaftDirectory)
-	if err != nil {
-		log.Fatalln("could not read raft dir, err: ", err.Error())
-	}
-
-	fmt.Println("BOOTSTRAP AND dir: ", cfg.RaftBootstrap, dirs)
-
 	// check if no raft data on disk, only then bootstrap
-	if cfg.RaftBootstrap {
+	if cfg.RaftBootstrap && isEmptyRaftDirAtStartup {
+		log.Println("leader, bootstrapping")
 		configuration := raft.Configuration{
 			Servers: []raft.Server{
 				{
@@ -100,8 +103,37 @@ func (s *Store) Open() error {
 			},
 		}
 		ra.BootstrapCluster(configuration)
-	} else {
+
+		// wait till you become leader and add yourself as a peer
+
+		go func() {
+			timeout := time.After(8 * time.Second)
+			tick := time.NewTicker(200 * time.Millisecond)
+			defer tick.Stop()
+			for {
+				select {
+				case <-timeout:
+					log.Println("timed out waiting to become leader to add self to peer list")
+					return
+				case <-tick.C:
+					if s.Raft.State() == raft.Leader {
+						if err := s.AddNode(cfg.RaftAddress, cfg.RaftSelfHTTPAddress); err != nil {
+							log.Println("could not add self into PeerHTTP via AddNode:", err)
+						} else {
+							log.Println("added self to PeerHTTP via AddNode")
+						}
+						return
+					}
+				}
+			}
+		}()
+
+	} else if cfg.RaftJoinAddress != "" {
 		// join cluster at join address
+		err = JoinLeaderAsFollower(cfg.RaftSelfHTTPAddress, cfg.RaftJoinAddress, cfg.RaftAddress, cfg.RaftId)
+		if err != nil {
+			log.Fatalln("could not join specified leader, err: ", err)
+		}
 	}
 
 	return nil
@@ -119,6 +151,8 @@ func (f *fsm) Apply(l *raft.Log) interface{} {
 		return f.ApplyAddDocument(c.IdxName, c.Param)
 	case CmdCreateIndex:
 		return f.ApplyCreateIndex(c.IdxName, c.Param)
+	case CmdAddNode:
+		return f.ApplyAddNode(c.NodeAddress, c.NodeHTTPAddress)
 	default:
 		panic(fmt.Sprintf("unrecognized command op ID: %d", c.CmdId))
 	}
@@ -159,6 +193,12 @@ func (f *fsm) ApplyCreateIndex(idxName string, cs int) error {
 	}
 
 	f.ActiveIndices[idxName] = NewIndex(idxName, cs == 1, f.mc)
+	return nil
+}
+
+func (f *fsm) ApplyAddNode(nodeAddr, nodeHTTPAddr string) error {
+	log.Printf("-----applying add node of %s with http addr: %s\n", nodeAddr, nodeHTTPAddr)
+	f.PeerHTTP[nodeAddr] = nodeHTTPAddr
 	return nil
 }
 

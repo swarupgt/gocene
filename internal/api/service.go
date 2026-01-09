@@ -32,6 +32,13 @@ func NewService() *Service {
 	}
 
 	s.st = store.New(s.minioClient)
+
+	// add yourself as a peer if alone
+	// err = s.st.AddNode(config.RaftAddress, config.RaftSelfHTTPAddress)
+	// if err != nil {
+	// 	log.Fatalln("could not add myself to raft log, err: ", err.Error())
+	// }
+
 	return s
 }
 
@@ -43,7 +50,6 @@ func (s *Service) CreateIndex(inp CreateIndexInput) (res *CreateIndexResult, err
 		if err == store.ErrNotLeader {
 			return s.ForwardCreateIndexToLeader(inp)
 		}
-		return nil, err
 	}
 
 	return &CreateIndexResult{
@@ -118,12 +124,20 @@ func (s *Service) SearchFullText(idxName string, inp SearchInput) (res *SearchRe
 }
 
 // Add the requesting node to the cluster if leader, and forwards the request to the leader if not.
-func (s *Service) Join(inp JoinInput) (err error) {
+func (s *Service) Join(inp JoinInput) (res *JoinResult, err error) {
 	if s.st.Raft.State() != raft.Leader {
+		log.Println("not leader, forwarding...")
 		return s.ForwardJoinToLeader(inp)
 	}
 
-	return s.st.Join(inp.NodeID, inp.Address)
+	err = s.st.Join(inp.NodeID, inp.Address, inp.HTTPAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	return &JoinResult{
+		LeaderHTTPAddress: config.RaftSelfHTTPAddress,
+	}, nil
 }
 
 // Returns the Raft status of the node.
@@ -137,6 +151,7 @@ func (s *Service) Status() (res StatusResult, err error) {
 // Forwards the add doc request to the leader.
 func (s *Service) ForwardAddDocumentToLeader(idxName string, inp AddDocumentInput) (res *AddDocumentResult, err error) {
 	leaderAddr, _ := s.st.Raft.LeaderWithID()
+	leaderHTTPAddr := s.st.PeerHTTP[string(leaderAddr)]
 
 	// leader does exist, forward request to it
 	if leaderAddr != "" {
@@ -150,10 +165,15 @@ func (s *Service) ForwardAddDocumentToLeader(idxName string, inp AddDocumentInpu
 		}
 
 		resp, lerr := http.Post(
-			string(leaderAddr)+config.EndpointsMap[config.AddDocumentAPI],
+			"http://"+string(leaderHTTPAddr)+"/"+idxName+"/add_document",
 			"application/json",
 			bytes.NewBuffer(data),
 		)
+
+		if lerr != nil {
+			log.Println("could not forward add doc to leader, err: ", lerr.Error())
+			return nil, lerr
+		}
 
 		defer resp.Body.Close()
 
@@ -165,6 +185,12 @@ func (s *Service) ForwardAddDocumentToLeader(idxName string, inp AddDocumentInpu
 			return nil, lerr
 		}
 
+		if resp.StatusCode == http.StatusBadRequest && finalRes.Error == "index specified does not exist" {
+			return &finalRes, store.ErrIdxDoesNotExist
+		} else if resp.StatusCode == http.StatusInternalServerError {
+			return &finalRes, errors.New("something went wrong")
+		}
+
 		return &finalRes, nil
 	}
 
@@ -174,6 +200,7 @@ func (s *Service) ForwardAddDocumentToLeader(idxName string, inp AddDocumentInpu
 func (s *Service) ForwardCreateIndexToLeader(inp CreateIndexInput) (res *CreateIndexResult, err error) {
 
 	leaderAddr, _ := s.st.Raft.LeaderWithID()
+	leaderHTTPAddr := s.st.PeerHTTP[string(leaderAddr)]
 
 	// leader does exist, forward request to it
 	if leaderAddr != "" {
@@ -185,10 +212,15 @@ func (s *Service) ForwardCreateIndexToLeader(inp CreateIndexInput) (res *CreateI
 		}
 
 		resp, lerr := http.Post(
-			string(leaderAddr)+config.EndpointsMap[config.CreateIndexAPI],
+			"http://"+string(leaderHTTPAddr)+config.EndpointsMap[config.CreateIndexAPI],
 			"application/json",
 			bytes.NewBuffer(data),
 		)
+
+		if lerr != nil {
+			log.Println("could not forward create index to leader, err: ", lerr.Error())
+			return nil, lerr
+		}
 
 		defer resp.Body.Close()
 
@@ -200,13 +232,59 @@ func (s *Service) ForwardCreateIndexToLeader(inp CreateIndexInput) (res *CreateI
 			return nil, lerr
 		}
 
+		if resp.StatusCode == http.StatusBadRequest && finalRes.Error == "index name already exists" {
+			return &finalRes, store.ErrIdxNameExists
+		} else if resp.StatusCode == http.StatusInternalServerError {
+			return &finalRes, errors.New("something went wrong")
+		}
+
 		return &finalRes, nil
 	}
 
 	return nil, errors.New("no leader detected")
 }
 
-func (s *Service) ForwardJoinToLeader(inp JoinInput) (err error) {
+func (s *Service) ForwardJoinToLeader(inp JoinInput) (res *JoinResult, err error) {
 
-	return
+	leaderAddr, _ := s.st.Raft.LeaderWithID()
+	leaderHTTPAddr := s.st.PeerHTTP[string(leaderAddr)]
+
+	// leader does exist, forward request to it
+	if leaderAddr != "" {
+
+		data, lerr := json.Marshal(inp)
+		if lerr != nil {
+			log.Println("could not marshal json in fwd to leader create index, err: ", lerr.Error())
+			return nil, lerr
+		}
+
+		resp, lerr := http.Post(
+			"http://"+string(leaderHTTPAddr)+config.EndpointsMap[config.JoinAPI],
+			"application/json",
+			bytes.NewBuffer(data),
+		)
+
+		if lerr != nil {
+			log.Println("could not forward join to leader, err: ", lerr.Error())
+			return nil, lerr
+		}
+
+		defer resp.Body.Close()
+		var finalRes JoinResult
+		data, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		if err = json.Unmarshal(data, &finalRes); err != nil {
+			return nil, err
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, errors.New("could not join leader")
+		}
+
+		return &finalRes, nil
+	}
+
+	return nil, errors.New("no leader detected")
 }

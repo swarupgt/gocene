@@ -25,13 +25,17 @@ type Store struct {
 	Raft     *raft.Raft
 	RaftDir  string
 	RaftBind string
+
+	// for forwarding if not leader
+	PeerHTTP map[string]string
 }
 
 type fsm Store
 
 type Node struct {
-	NodeID  string `json:"node_id"`
-	Address string `json:"address"`
+	NodeID      string `json:"node_id"`
+	Address     string `json:"address"`
+	HTTPAddress string `json:"http_address"`
 }
 
 type StatusResult struct {
@@ -42,7 +46,8 @@ type StatusResult struct {
 
 func New(mc *minio.Client) *Store {
 	s := &Store{
-		mc: mc,
+		mc:       mc,
+		PeerHTTP: make(map[string]string),
 	}
 	s.Init()
 
@@ -53,8 +58,6 @@ func (s *Store) Init() {
 	// if bootstrap, become leader. else join using join address
 	s.RaftBind = config.RaftAddress
 	s.RaftDir = config.RaftDirectory
-
-	fmt.Println("--------MINIO IS NIL??-----", s.mc == nil)
 
 	s.ActiveIndices = make(map[string]*Index)
 
@@ -155,42 +158,45 @@ func (s *Store) CreateIndex(idxName string, cs bool) (err error) {
 	return nil
 }
 
-// func (idx *Index) LoadDocumentsIntoIndex() (err error) {
-// 	reader := bufio.NewReader(idx.DocList)
+func (s *Store) AddNode(addr, httpAddr string) (err error) {
 
-// 	for {
-// 		docStr, err := reader.ReadString('\n')
-// 		if err == io.EOF {
-// 			if len(docStr) > 0 {
-// 				doc, err := CreateDocumentFromJSON(docStr)
-// 				if err != nil {
-// 					return err
-// 				}
-// 				idx.LoadDocument(doc)
-// 			}
-// 			break
-// 		}
+	if s.Raft.State() != raft.Leader {
+		return ErrNotLeader
+	}
 
-// 		if err != nil {
-// 			return err
-// 		}
+	// raft apply
+	// use Command.NodeAddress and Command.NodeHTTPAddress to store the new node's info into Raft logs.
 
-// 		doc, err := CreateDocumentFromJSON(docStr)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		idx.LoadDocument(doc)
+	c := Command{
+		CmdId:           CmdAddNode,
+		NodeAddress:     addr,
+		NodeHTTPAddress: httpAddr,
+	}
 
-// 	}
+	b, err := json.Marshal(c)
+	if err != nil {
+		return err
+	}
 
-// 	log.Println("added docs to idx", idx.Name)
+	f := s.Raft.Apply(b, config.RaftTimeout)
 
-// 	return nil
-// }
+	if f.Error() != nil {
+		return f.Error()
+	}
+
+	if resp := f.Response(); resp != nil {
+		if ferr, ok := resp.(error); ok {
+			return ferr
+		}
+		return fmt.Errorf("unexpected response from FSM: %T", resp)
+	}
+
+	return nil
+}
 
 // Join request
 // Assumes the leader request redirection if not leader has been handled in the service.
-func (s *Store) Join(nodeID, addr string) (err error) {
+func (s *Store) Join(nodeID, addr, httpAddr string) (err error) {
 
 	log.Printf("received join request for remote node %s at %s", nodeID, addr)
 
@@ -204,8 +210,7 @@ func (s *Store) Join(nodeID, addr string) (err error) {
 		// If a node already exists with either the joining node's ID or address,
 		// that node may need to be removed from the config first.
 		if srv.ID == raft.ServerID(nodeID) || srv.Address == raft.ServerAddress(addr) {
-			// However if *both* the ID and the address are the same, then nothing -- not even
-			// a join operation -- is needed.
+
 			if srv.Address == raft.ServerAddress(addr) && srv.ID == raft.ServerID(nodeID) {
 				log.Printf("node %s at %s already member of cluster, ignoring join request", nodeID, addr)
 				return nil
@@ -223,15 +228,19 @@ func (s *Store) Join(nodeID, addr string) (err error) {
 		return f.Error()
 	}
 	log.Printf("node %s at %s joined successfully", nodeID, addr)
-	return nil
+
+	// commit the join into the Raft logs
+	return s.AddNode(addr, httpAddr)
 }
 
-// Status returns information about the Store.
+// Status returns Raft information (id, address, and HTTP reachable address)
+// about the Store, who I am, who the leader is, and who the followers are.
 func (s *Store) Status() (StatusResult, error) {
 	leaderServerAddr, leaderId := s.Raft.LeaderWithID()
 	leader := Node{
-		NodeID:  string(leaderId),
-		Address: string(leaderServerAddr),
+		NodeID:      string(leaderId),
+		Address:     string(leaderServerAddr),
+		HTTPAddress: s.PeerHTTP[string(leaderServerAddr)],
 	}
 
 	servers := s.Raft.GetConfiguration().Configuration().Servers
@@ -242,15 +251,17 @@ func (s *Store) Status() (StatusResult, error) {
 	for _, server := range servers {
 		if server.ID != leaderId {
 			followers = append(followers, Node{
-				NodeID:  string(server.ID),
-				Address: string(server.Address),
+				NodeID:      string(server.ID),
+				Address:     string(server.Address),
+				HTTPAddress: s.PeerHTTP[string(server.Address)],
 			})
 		}
 
 		if string(server.Address) == s.RaftBind {
 			me = Node{
-				NodeID:  string(server.ID),
-				Address: string(server.Address),
+				NodeID:      string(server.ID),
+				Address:     string(server.Address),
+				HTTPAddress: s.PeerHTTP[string(server.Address)],
 			}
 		}
 	}
