@@ -22,7 +22,8 @@ const SnapshotCount = 2
 
 // fsmSnapshot stores the entire Store metadata in one object for Raft snapshotting.
 type fsmSnapshot struct {
-	ActiveIndices []IndexMetadata `json:"active_indices"`
+	ActiveIndices []IndexMetadata   `json:"active_indices"`
+	PeerHTTP      map[string]string `json:"peer_http"`
 }
 
 // for Raft index snapshot loading
@@ -248,6 +249,11 @@ func (f *fsm) Snapshot() (raft.FSMSnapshot, error) {
 		fSnap.ActiveIndices = append(fSnap.ActiveIndices, idxMd)
 	}
 
+	fSnap.PeerHTTP = make(map[string]string, len(f.PeerHTTP))
+	for addr, httpAddr := range f.PeerHTTP {
+		fSnap.PeerHTTP[addr] = httpAddr
+	}
+
 	return fSnap, nil
 }
 
@@ -260,8 +266,13 @@ func (f *fsm) Restore(rc io.ReadCloser) error {
 		return err
 	}
 
+	newActiveIndices := make(map[string]*Index, len(fSnap.ActiveIndices))
+
 	for _, idxMd := range fSnap.ActiveIndices {
 		tempIdx := NewIndex(idxMd.Name, idxMd.CaseSensitivity, f.mc)
+		tempIdx.SegCount = idxMd.SegCount
+		tempIdx.NextDocID = idxMd.NextDocID
+
 		for _, segMd := range idxMd.SegmentList {
 
 			// if immutable segments, append to seg list
@@ -275,6 +286,7 @@ func (f *fsm) Restore(rc io.ReadCloser) error {
 				// tempSeg.PostingsMap = segMd.PostingsMap
 				tempSeg.DocCount = segMd.DocCount
 				tempSeg.ByteSize = segMd.ByteSize
+				tempIdx.Segments = append(tempIdx.Segments, tempSeg)
 			} else {
 				tempAsSeg, err := NewActiveSegment(segMd.Name, tempIdx)
 				if err != nil {
@@ -286,8 +298,16 @@ func (f *fsm) Restore(rc io.ReadCloser) error {
 				tempAsSeg.Seg.DocCount = segMd.DocCount
 				tempAsSeg.DocCount = segMd.DocCount
 				tempAsSeg.Seg.ByteSize = segMd.ByteSize
+				tempIdx.As = tempAsSeg
 			}
 		}
+
+		newActiveIndices[idxMd.Name] = tempIdx
+	}
+
+	newPeerHTTP := make(map[string]string, len(fSnap.PeerHTTP))
+	for addr, httpAddr := range fSnap.PeerHTTP {
+		newPeerHTTP[addr] = httpAddr
 	}
 
 	var err error
@@ -296,6 +316,12 @@ func (f *fsm) Restore(rc io.ReadCloser) error {
 		log.Fatalln("could not create minio client, err: ", err.Error())
 		return err
 	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.ActiveIndices = newActiveIndices
+	f.PeerHTTP = newPeerHTTP
 
 	return nil
 }
