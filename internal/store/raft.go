@@ -162,7 +162,11 @@ func (f *fsm) Apply(l *raft.Log) interface{} {
 // Apply adding document to the FSM store
 func (f *fsm) ApplyAddDocument(idxName string, docID int) interface{} {
 
-	if _, ok := f.ActiveIndices[idxName]; !ok {
+	f.mu.RLock()
+	idx, ok := f.ActiveIndices[idxName]
+	f.mu.RUnlock()
+
+	if !ok {
 		return ErrIdxDoesNotExist
 	}
 
@@ -178,7 +182,7 @@ func (f *fsm) ApplyAddDocument(idxName string, docID int) interface{} {
 		return err
 	}
 
-	id, err := f.ActiveIndices[idxName].AddDocument(doc)
+	id, err := idx.AddDocument(doc)
 	if err != nil {
 		return err
 	}
@@ -188,6 +192,9 @@ func (f *fsm) ApplyAddDocument(idxName string, docID int) interface{} {
 
 // Applying creating an index to the FSM Store
 func (f *fsm) ApplyCreateIndex(idxName string, cs int) error {
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
 
 	if _, ok := f.ActiveIndices[idxName]; ok {
 		return ErrIdxNameExists
@@ -199,6 +206,10 @@ func (f *fsm) ApplyCreateIndex(idxName string, cs int) error {
 
 func (f *fsm) ApplyAddNode(nodeAddr, nodeHTTPAddr string) error {
 	log.Printf("-----applying add node of %s with http addr: %s\n", nodeAddr, nodeHTTPAddr)
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	f.PeerHTTP[nodeAddr] = nodeHTTPAddr
 	return nil
 }
@@ -288,17 +299,19 @@ func (f *fsm) Restore(rc io.ReadCloser) error {
 				tempSeg.ByteSize = segMd.ByteSize
 				tempIdx.Segments = append(tempIdx.Segments, tempSeg)
 			} else {
-				tempAsSeg, err := NewActiveSegment(segMd.Name, tempIdx)
+				// build the active segment's Seg in place rather than assigning a whole
+				// ActiveSegment value into tempIdx.As
+				activeSeg, err := NewSegment(segMd.Name, tempIdx)
 				if err != nil {
 					log.Println("could not create active segment while restoring snapshot, err: ", err.Error())
 					return err
 				}
-				tempAsSeg.Seg.TermDict = segMd.TermDict
-				// tempAsSeg.Seg.PostingsMap = segMd.PostingsMap
-				tempAsSeg.Seg.DocCount = segMd.DocCount
-				tempAsSeg.DocCount = segMd.DocCount
-				tempAsSeg.Seg.ByteSize = segMd.ByteSize
-				tempIdx.As = tempAsSeg
+				activeSeg.TermDict = segMd.TermDict
+				// activeSeg.PostingsMap = segMd.PostingsMap
+				activeSeg.DocCount = segMd.DocCount
+				activeSeg.ByteSize = segMd.ByteSize
+				tempIdx.As.Seg = activeSeg
+				tempIdx.As.DocCount = segMd.DocCount
 			}
 		}
 

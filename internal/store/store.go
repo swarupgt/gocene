@@ -18,8 +18,7 @@ type Store struct {
 	ActiveIndices map[string]*Index
 	mc            *minio.Client
 
-	// lock should be used only used while snapshotting
-	mu *sync.Mutex
+	mu sync.RWMutex
 
 	// raft stuff
 	Raft     *raft.Raft
@@ -68,18 +67,46 @@ func (s *Store) Init() {
 
 }
 
+// -- use these to be concurrent-safe
+
+func (s *Store) GetIndex(name string) (*Index, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	idx, ok := s.ActiveIndices[name]
+	return idx, ok
+}
+
+func (s *Store) IndexNames() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	names := make([]string, 0, len(s.ActiveIndices))
+	for name := range s.ActiveIndices {
+		names = append(names, name)
+	}
+	return names
+}
+
+func (s *Store) PeerHTTPAddr(addr string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.PeerHTTP[addr]
+}
+
+// -- actual store functions
+
 func (s *Store) AddDocument(idxName string, docData map[string]any) (docId int, err error) {
 
 	if s.Raft.State() != raft.Leader {
 		return 0, ErrNotLeader
 	}
 
-	if _, ok := s.ActiveIndices[idxName]; !ok {
+	idx, ok := s.GetIndex(idxName)
+	if !ok {
 		return 0, ErrIdxDoesNotExist
 	}
 
 	// store docto S3
-	err = utils.StoreDocumentToMinio(s.mc, s.ActiveIndices[idxName].NextDocID, docData, idxName)
+	err = utils.StoreDocumentToMinio(s.mc, idx.NextDocID, docData, idxName)
 	if err != nil {
 		return 0, err
 	}
@@ -90,7 +117,7 @@ func (s *Store) AddDocument(idxName string, docData map[string]any) (docId int, 
 	c := Command{
 		CmdId:   CmdAddDocument,
 		IdxName: idxName,
-		Param:   s.ActiveIndices[idxName].NextDocID,
+		Param:   idx.NextDocID,
 	}
 
 	b, err := json.Marshal(c)
@@ -240,7 +267,7 @@ func (s *Store) Status() (StatusResult, error) {
 	leader := Node{
 		NodeID:      string(leaderId),
 		Address:     string(leaderServerAddr),
-		HTTPAddress: s.PeerHTTP[string(leaderServerAddr)],
+		HTTPAddress: s.PeerHTTPAddr(string(leaderServerAddr)),
 	}
 
 	servers := s.Raft.GetConfiguration().Configuration().Servers
@@ -253,7 +280,7 @@ func (s *Store) Status() (StatusResult, error) {
 			followers = append(followers, Node{
 				NodeID:      string(server.ID),
 				Address:     string(server.Address),
-				HTTPAddress: s.PeerHTTP[string(server.Address)],
+				HTTPAddress: s.PeerHTTPAddr(string(server.Address)),
 			})
 		}
 
@@ -261,7 +288,7 @@ func (s *Store) Status() (StatusResult, error) {
 			me = Node{
 				NodeID:      string(server.ID),
 				Address:     string(server.Address),
-				HTTPAddress: s.PeerHTTP[string(server.Address)],
+				HTTPAddress: s.PeerHTTPAddr(string(server.Address)),
 			}
 		}
 	}

@@ -60,9 +60,8 @@ func (s *Service) CreateIndex(inp CreateIndexInput) (res *CreateIndexResult, err
 // Gets the list of all active indices on the service.
 func (s *Service) GetIndices() (res *GetIndicesResult, err error) {
 
-	res = &GetIndicesResult{}
-	for idxName := range s.st.ActiveIndices {
-		res.IndicesList = append(res.IndicesList, idxName)
+	res = &GetIndicesResult{
+		IndicesList: s.st.IndexNames(),
 	}
 
 	return
@@ -99,10 +98,9 @@ func (s *Service) SearchFullText(idxName string, inp SearchInput) (res *SearchRe
 
 	log.Println("inside service SearchFullText()")
 
-	var idx *store.Index
-	var ok bool
+	idx, ok := s.st.GetIndex(idxName)
 
-	if idx, ok = s.st.ActiveIndices[idxName]; !ok {
+	if !ok {
 		log.Println(store.ErrIdxDoesNotExist.Error())
 		// index does not exist
 		return nil, store.ErrIdxDoesNotExist
@@ -151,7 +149,7 @@ func (s *Service) Status() (res StatusResult, err error) {
 // Forwards the add doc request to the leader.
 func (s *Service) ForwardAddDocumentToLeader(idxName string, inp AddDocumentInput) (res *AddDocumentResult, err error) {
 	leaderAddr, _ := s.st.Raft.LeaderWithID()
-	leaderHTTPAddr := s.st.PeerHTTP[string(leaderAddr)]
+	leaderHTTPAddr := s.st.PeerHTTPAddr(string(leaderAddr))
 
 	// leader does exist, forward request to it
 	if leaderAddr != "" {
@@ -200,7 +198,7 @@ func (s *Service) ForwardAddDocumentToLeader(idxName string, inp AddDocumentInpu
 func (s *Service) ForwardCreateIndexToLeader(inp CreateIndexInput) (res *CreateIndexResult, err error) {
 
 	leaderAddr, _ := s.st.Raft.LeaderWithID()
-	leaderHTTPAddr := s.st.PeerHTTP[string(leaderAddr)]
+	leaderHTTPAddr := s.st.PeerHTTPAddr(string(leaderAddr))
 
 	// leader does exist, forward request to it
 	if leaderAddr != "" {
@@ -247,7 +245,7 @@ func (s *Service) ForwardCreateIndexToLeader(inp CreateIndexInput) (res *CreateI
 func (s *Service) ForwardJoinToLeader(inp JoinInput) (res *JoinResult, err error) {
 
 	leaderAddr, _ := s.st.Raft.LeaderWithID()
-	leaderHTTPAddr := s.st.PeerHTTP[string(leaderAddr)]
+	leaderHTTPAddr := s.st.PeerHTTPAddr(string(leaderAddr))
 
 	// leader does exist, forward request to it
 	if leaderAddr != "" {
